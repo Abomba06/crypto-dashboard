@@ -17,19 +17,58 @@ function Dashboard() {
   const [trades, setTrades] = useState<any[]>([]);
   const [stitchLayout, setStitchLayout] = useState<any>(null);
   const [stitchError, setStitchError] = useState<string>('');
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string>('');
 
   useEffect(() => {
-    dashboardService.getPortfolioSummary().then(setSummary);
-    dashboardService.getPositions().then(setPositions);
-    dashboardService.getSignals().then(setSignals);
-    dashboardService.getMarketEvents().then(setEvents);
-    dashboardService.getTrades().then(setTrades);
+    const loadData = async () => {
+      try {
+        setLoading(true);
+        setError('');
 
-    if (useStitch) {
-      loadStitchScreen('dashboard')
-        .then(setStitchLayout)
-        .catch((error) => setStitchError(error.message));
-    }
+        const [summaryData, positionsData, signalsData, eventsData, tradesData] = await Promise.all([
+          dashboardService.getPortfolioSummary(),
+          dashboardService.getPositions(),
+          dashboardService.getSignals(),
+          dashboardService.getMarketEvents(),
+          dashboardService.getTrades(),
+        ]);
+
+        setSummary(summaryData);
+        setPositions(positionsData);
+        setSignals(signalsData);
+        setEvents(eventsData);
+        setTrades(tradesData);
+
+        if (useStitch) {
+          try {
+            const stitchData = await loadStitchScreen('dashboard');
+            setStitchLayout(stitchData);
+          } catch (stitchErr: any) {
+            setStitchError(stitchErr.message);
+          }
+        }
+      } catch (err: any) {
+        setError(err.message || 'Failed to load dashboard data');
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    loadData();
+
+    // Set up realtime subscriptions
+    const unsubSummary = dashboardService.subscribeToPortfolioSummary(setSummary);
+    const unsubPositions = dashboardService.subscribeToPositions(setPositions);
+    const unsubSignals = dashboardService.subscribeToSignals(setSignals);
+    const unsubTrades = dashboardService.subscribeToTrades(setTrades);
+
+    return () => {
+      unsubSummary.unsubscribe();
+      unsubPositions.unsubscribe();
+      unsubSignals.unsubscribe();
+      unsubTrades.unsubscribe();
+    };
   }, []);
 
   if (useStitch && stitchLayout) {
@@ -45,7 +84,57 @@ function Dashboard() {
     );
   }
 
-  if (!summary) return <div className="page-shell">Loading dashboard...</div>;
+  if (loading) {
+    return (
+      <section className="page-shell">
+        <div className="dashboard-panel card-slim">
+          <div className="panel-heading">
+            <h2>Loading Dashboard...</h2>
+          </div>
+          <div style={{ textAlign: 'center', padding: '2rem', color: '#94a3b8' }}>
+            Connecting to Supabase and loading data...
+          </div>
+        </div>
+      </section>
+    );
+  }
+
+  if (error) {
+    return (
+      <section className="page-shell">
+        <div className="dashboard-panel card-slim">
+          <div className="panel-heading">
+            <h2>Dashboard Error</h2>
+          </div>
+          <div style={{ textAlign: 'center', padding: '2rem', color: '#f87171' }}>
+            {error}
+            <br />
+            <button
+              onClick={() => window.location.reload()}
+              style={{ marginTop: '1rem', padding: '0.5rem 1rem', background: '#3b82f6', color: 'white', border: 'none', borderRadius: '0.5rem' }}
+            >
+              Retry
+            </button>
+          </div>
+        </div>
+      </section>
+    );
+  }
+
+  if (!summary) {
+    return (
+      <section className="page-shell">
+        <div className="dashboard-panel card-slim">
+          <div className="panel-heading">
+            <h2>No Data Available</h2>
+          </div>
+          <div style={{ textAlign: 'center', padding: '2rem', color: '#94a3b8' }}>
+            No portfolio data found. Using mock data as fallback.
+          </div>
+        </div>
+      </section>
+    );
+  }
 
   return (
     <section className="page-shell">
@@ -56,7 +145,7 @@ function Dashboard() {
         </div>
         <div className="topbar-status">
           <span className="status-pill live">Live Sync</span>
-          <span className="status-pill">Bot Health: Nominal</span>
+          <span className="status-pill">Bot Health: {summary.health}</span>
           <span className="status-pill secondary">Market regime: {summary.regime}</span>
         </div>
       </div>
@@ -93,7 +182,7 @@ function Dashboard() {
             <MetricCard label="Open P/L" value={`${summary.openPnL >= 0 ? '+' : '-'}$${Math.abs(summary.openPnL).toFixed(2)}`} variant={summary.openPnL >= 0 ? 'positive' : 'negative'} />
             <MetricCard label="Buying Power" value={`$${summary.buyingPower.toLocaleString()}`} />
             <MetricCard label="Signal Accuracy" value={`${summary.signalAccuracy}%`} subText="Current AI confidence" variant="neutral" />
-            <MetricCard label="Active Bots" value={`${summary.activeBots}`} subText="System availability" />
+            <MetricCard label="Active Bots" value={`${summary.activeBots || 1}`} subText="System availability" />
           </div>
 
           <div className="summary-footer">
@@ -120,7 +209,13 @@ function Dashboard() {
             </div>
             <span className="live-badge">LIVE</span>
           </div>
-          <SignalCard signal={signals[0]} />
+          {signals.length > 0 ? (
+            <SignalCard signal={signals[0]} />
+          ) : (
+            <div style={{ textAlign: 'center', padding: '2rem', color: '#94a3b8' }}>
+              No signals available
+            </div>
+          )}
         </div>
 
         <div className="dashboard-panel card-slim catalyst-panel">
@@ -129,9 +224,15 @@ function Dashboard() {
               <p className="micro-label">Market catalyst</p>
               <h3>Latest Catalyst</h3>
             </div>
-            <span className="status-badge glass">{events[0]?.tag}</span>
+            <span className="status-badge glass">{events[0]?.impact || 'N/A'}</span>
           </div>
-          <NewsCatalystCard event={events[0]} />
+          {events.length > 0 ? (
+            <NewsCatalystCard event={events[0]} />
+          ) : (
+            <div style={{ textAlign: 'center', padding: '2rem', color: '#94a3b8' }}>
+              No market events available
+            </div>
+          )}
         </div>
 
         <div className="dashboard-panel chart-card chart-summary">
@@ -140,7 +241,7 @@ function Dashboard() {
               <p className="micro-label">Signal quality</p>
               <h3>Accepted vs Rejected Signals</h3>
             </div>
-            <span className="status-badge glass small">Confidence +92%</span>
+            <span className="status-badge glass small">Confidence +{summary.signalAccuracy}%</span>
           </div>
           <div className="mini-report">
             <div className="report-bar positive" style={{ width: '68%' }}>Accepted</div>
@@ -151,20 +252,32 @@ function Dashboard() {
 
         <div className="dashboard-panel positions-preview">
           <div className="panel-heading"><h3>Active Positions</h3></div>
-          {positions.slice(0, 2).map((position) => (
-            <PositionCard position={position} key={position.symbol} />
-          ))}
+          {positions.length > 0 ? (
+            positions.slice(0, 2).map((position) => (
+              <PositionCard position={position} key={position.symbol} />
+            ))
+          ) : (
+            <div style={{ textAlign: 'center', padding: '2rem', color: '#94a3b8' }}>
+              No active positions
+            </div>
+          )}
         </div>
 
         <div className="dashboard-panel trades-preview">
           <div className="panel-heading"><h3>Recent Trades</h3></div>
-          {trades.slice(0, 2).map((trade) => (
-            <div className="trade-preview-row" key={trade.id}>
-              <div>{trade.symbol}</div>
-              <div>{trade.action.toUpperCase()}</div>
-              <div>{trade.price}</div>
+          {trades.length > 0 ? (
+            trades.slice(0, 2).map((trade) => (
+              <div className="trade-preview-row" key={trade.id}>
+                <div>{trade.symbol}</div>
+                <div>{trade.side.toUpperCase()}</div>
+                <div>{trade.price}</div>
+              </div>
+            ))
+          ) : (
+            <div style={{ textAlign: 'center', padding: '2rem', color: '#94a3b8' }}>
+              No recent trades
             </div>
-          ))}
+          )}
         </div>
       </div>
     </section>

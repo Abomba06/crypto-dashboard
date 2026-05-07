@@ -5,12 +5,76 @@ import { BotState } from '../types/trading';
 
 function State() {
   const [state, setState] = useState<BotState | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string>('');
 
   useEffect(() => {
-    dashboardService.getBotState().then(setState);
+    const loadData = async () => {
+      try {
+        setLoading(true);
+        setError('');
+        const data = await dashboardService.getBotState();
+        setState(data);
+      } catch (err: any) {
+        setError(err.message || 'Failed to load bot state');
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    loadData();
+
+    // Subscribe to realtime bot state updates
+    const unsubscribe = dashboardService.subscribeToBotState(setState);
+
+    return () => unsubscribe.unsubscribe();
   }, []);
 
-  if (!state) return <section className="page-shell">Loading state...</section>;
+  if (loading) {
+    return (
+      <section className="page-shell">
+        <div className="section-header">
+          <h2>Loading Bot State...</h2>
+        </div>
+        <div style={{ textAlign: 'center', padding: '2rem', color: '#94a3b8' }}>
+          Fetching bot state from Supabase...
+        </div>
+      </section>
+    );
+  }
+
+  if (error) {
+    return (
+      <section className="page-shell">
+        <div className="section-header">
+          <h2>Bot State Error</h2>
+        </div>
+        <div style={{ textAlign: 'center', padding: '2rem', color: '#f87171' }}>
+          {error}
+          <br />
+          <button
+            onClick={() => window.location.reload()}
+            style={{ marginTop: '1rem', padding: '0.5rem 1rem', background: '#3b82f6', color: 'white', border: 'none', borderRadius: '0.5rem' }}
+          >
+            Retry
+          </button>
+        </div>
+      </section>
+    );
+  }
+
+  if (!state) {
+    return (
+      <section className="page-shell">
+        <div className="section-header">
+          <h2>No Bot State Available</h2>
+        </div>
+        <div style={{ textAlign: 'center', padding: '2rem', color: '#94a3b8' }}>
+          No bot state data found. Using mock data as fallback.
+        </div>
+      </section>
+    );
+  }
 
   return (
     <section className="page-shell">
@@ -22,16 +86,20 @@ function State() {
       </div>
       <div className="state-grid">
         <div className="state-panel">
-          <h3>Open positions</h3>
-          <p>{(state.openPositions as string[]).join(', ')}</p>
+          <h3>Status</h3>
+          <p>{state.status}</p>
         </div>
         <div className="state-panel">
-          <h3>Watched symbols</h3>
-          <p>{(state.watchedSymbols as string[]).join(', ')}</p>
+          <h3>Last Active</h3>
+          <p>{state.lastActive}</p>
         </div>
         <div className="state-panel">
-          <h3>Risk state</h3>
-          <p>{state.riskState as string}</p>
+          <h3>Uptime</h3>
+          <p>{state.uptime} seconds</p>
+        </div>
+        <div className="state-panel">
+          <h3>Version</h3>
+          <p>{state.version}</p>
         </div>
       </div>
       <JsonAccordion data={state} label="Raw bot state" />

@@ -18,6 +18,7 @@ export interface PortfolioSummary {
 }
 
 export interface Position {
+  id: string;
   symbol: string;
   name: string;
   price: number;
@@ -30,6 +31,8 @@ export interface Position {
   tp1: number;
   tp2: number;
   sparkline: number[];
+  createdAt: string;
+  updatedAt: string;
 }
 
 export interface Signal {
@@ -44,21 +47,86 @@ export interface Signal {
   reason: string;
   status: SignalStatus;
   createdAt: string;
+  updatedAt: string;
 }
 
 export interface MarketEvent {
   id: string;
-  headline: string;
-  symbol: string;
-  source: string;
-  eventType: string;
-  predictedType: string;
-  probability: number;
-  sentimentScore: number;
-  relevance: number;
+  title: string;
+  description: string;
+  impact: 'high' | 'medium' | 'low';
+  sentiment: SentimentLabel;
   confirmation: EventConfirmation;
-  action: string;
-  tag: string;
+  timestamp: string;
+  createdAt: string;
+}
+
+export interface Trade {
+  id: string;
+  symbol: string;
+  side: 'buy' | 'sell';
+  quantity: number;
+  price: number;
+  timestamp: string;
+  pnl: number | null;
+  createdAt: string;
+}
+
+export interface LogEntry {
+  id: string;
+  level: 'info' | 'warn' | 'error';
+  message: string;
+  timestamp: string;
+  createdAt: string;
+}
+
+export interface EvaluationRecord {
+  id: string;
+  signalId: string;
+  evaluation: string;
+  score: number;
+  type: 'candidate' | 'rejected';
+  createdAt: string;
+}
+
+export interface ResearchReport {
+  id: string;
+  title: string;
+  summary: string;
+  content: string;
+  author: string;
+  timestamp: string;
+  createdAt: string;
+}
+
+export interface VariantReport {
+  id: string;
+  title: string;
+  summary: string;
+  content: string;
+  author: string;
+  timestamp: string;
+  createdAt: string;
+}
+
+export interface ComparisonReport {
+  id: string;
+  title: string;
+  summary: string;
+  content: string;
+  author: string;
+  timestamp: string;
+  createdAt: string;
+}
+
+export interface BotState {
+  id: string;
+  status: 'running' | 'paused' | 'stopped';
+  lastActive: string;
+  uptime: number;
+  version: string;
+  createdAt: string;
+  updatedAt: string;
 }
 
 export interface Trade {

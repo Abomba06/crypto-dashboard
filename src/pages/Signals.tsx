@@ -10,9 +10,29 @@ function Signals() {
   const [signals, setSignals] = useState<Signal[]>([]);
   const [activeTab, setActiveTab] = useState<typeof tabs[number]>('All');
   const [selected, setSelected] = useState<Signal | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string>('');
 
   useEffect(() => {
-    dashboardService.getSignals().then(setSignals);
+    const loadData = async () => {
+      try {
+        setLoading(true);
+        setError('');
+        const data = await dashboardService.getSignals();
+        setSignals(data);
+      } catch (err: any) {
+        setError(err.message || 'Failed to load signals');
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    loadData();
+
+    // Subscribe to realtime updates
+    const unsubscribe = dashboardService.subscribeToSignals(setSignals);
+
+    return () => unsubscribe.unsubscribe();
   }, []);
 
   const filtered = useMemo(() => {
@@ -20,6 +40,39 @@ function Signals() {
     if (activeTab === 'Candidates') return signals.filter((signal) => signal.status === 'candidate');
     return signals.filter((signal) => signal.status === activeTab.toLowerCase());
   }, [activeTab, signals]);
+
+  if (loading) {
+    return (
+      <section className="page-shell">
+        <div className="section-header">
+          <h2>Loading Signals...</h2>
+        </div>
+        <div style={{ textAlign: 'center', padding: '2rem', color: '#94a3b8' }}>
+          Fetching signal data from Supabase...
+        </div>
+      </section>
+    );
+  }
+
+  if (error) {
+    return (
+      <section className="page-shell">
+        <div className="section-header">
+          <h2>Signals Error</h2>
+        </div>
+        <div style={{ textAlign: 'center', padding: '2rem', color: '#f87171' }}>
+          {error}
+          <br />
+          <button
+            onClick={() => window.location.reload()}
+            style={{ marginTop: '1rem', padding: '0.5rem 1rem', background: '#3b82f6', color: 'white', border: 'none', borderRadius: '0.5rem' }}
+          >
+            Retry
+          </button>
+        </div>
+      </section>
+    );
+  }
 
   return (
     <section className="page-shell">
@@ -38,9 +91,15 @@ function Signals() {
         ))}
       </div>
       <div className="signal-list">
-        {filtered.map((signal) => (
-          <SignalCard key={signal.id} signal={signal} onSelect={setSelected} />
-        ))}
+        {filtered.length > 0 ? (
+          filtered.map((signal) => (
+            <SignalCard key={signal.id} signal={signal} onSelect={setSelected} />
+          ))
+        ) : (
+          <div style={{ textAlign: 'center', padding: '2rem', color: '#94a3b8' }}>
+            No signals found for the selected filter.
+          </div>
+        )}
       </div>
       {selected ? (
         <div className="detail-drawer">
