@@ -1,10 +1,13 @@
 import React, { useEffect, useState } from 'react';
 import { dashboardService } from '../services/dashboardService';
+import { loadStitchScreen } from '../services/stitchService';
 import { MetricCard } from '../components/MetricCard';
 import { PositionCard } from '../components/PositionCard';
 import { NewsCatalystCard } from '../components/NewsCatalystCard';
 import { SignalCard } from '../components/SignalCard';
 import { StatusBadge } from '../components/StatusBadge';
+
+const useStitch = import.meta.env.VITE_USE_STITCH === 'true';
 
 function Dashboard() {
   const [summary, setSummary] = useState<any>(null);
@@ -12,6 +15,8 @@ function Dashboard() {
   const [signals, setSignals] = useState<any[]>([]);
   const [events, setEvents] = useState<any[]>([]);
   const [trades, setTrades] = useState<any[]>([]);
+  const [stitchLayout, setStitchLayout] = useState<any>(null);
+  const [stitchError, setStitchError] = useState<string>('');
 
   useEffect(() => {
     dashboardService.getPortfolioSummary().then(setSummary);
@@ -19,7 +24,26 @@ function Dashboard() {
     dashboardService.getSignals().then(setSignals);
     dashboardService.getMarketEvents().then(setEvents);
     dashboardService.getTrades().then(setTrades);
+
+    if (useStitch) {
+      loadStitchScreen('dashboard')
+        .then(setStitchLayout)
+        .catch((error) => setStitchError(error.message));
+    }
   }, []);
+
+  if (useStitch && stitchLayout) {
+    return (
+      <section className="page-shell">
+        <div className="dashboard-panel card-slim">
+          <div className="panel-heading">
+            <h2>Stitch Remote UI</h2>
+          </div>
+          <pre style={{ color: '#cbd5e1', whiteSpace: 'pre-wrap' }}>{JSON.stringify(stitchLayout, null, 2)}</pre>
+        </div>
+      </section>
+    );
+  }
 
   if (!summary) return <div className="page-shell">Loading dashboard...</div>;
 
