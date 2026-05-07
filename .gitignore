@@ -1,0 +1,8 @@
+# Ignore local Stitch credentials
+stitch.local.toml
+
+# Node/Vite
+node_modules/
+dist/
+.env*
+.vite/
