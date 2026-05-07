@@ -22,6 +22,8 @@ export const portfolioSummary: PortfolioSummary = {
   topMover: 'SOL',
   health: 'nominal',
   recentError: 'Last fetch delay 1.8s',
+  signalAccuracy: 92,
+  lastUpdated: '11:28 AM UTC',
 };
 
 export const positions: Position[] = [

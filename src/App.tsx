@@ -32,7 +32,7 @@ function App() {
 
   return (
     <div className="app-shell">
-      <header className="app-header">
+      <header className="app-header glass-shell">
         <div>
           <p className="micro-label">Crypto Bot Control Center</p>
           <h1>Operational Dashboard</h1>

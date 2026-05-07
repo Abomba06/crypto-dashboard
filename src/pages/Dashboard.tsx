@@ -49,40 +49,98 @@ function Dashboard() {
 
   return (
     <section className="page-shell">
+      <div className="dashboard-topbar">
+        <div>
+          <p className="micro-label header-caption">AI Trading OS • Live Crypto Command Center</p>
+          <h2>Operational Console</h2>
+        </div>
+        <div className="topbar-status">
+          <span className="status-pill live">Live Sync</span>
+          <span className="status-pill">Bot Health: Nominal</span>
+          <span className="status-pill secondary">Market regime: {summary.regime}</span>
+        </div>
+      </div>
+
       <div className="dashboard-grid">
         <div className="dashboard-panel dashboard-summary">
-          <div className="panel-heading">
-            <h2>Portfolio Summary</h2>
-            <StatusBadge type={summary.health.toUpperCase()} variant={summary.health === 'nominal' ? 'success' : summary.health === 'watch' ? 'warning' : 'danger'} />
+          <div className="panel-heading summary-heading">
+            <div>
+              <p className="micro-label">Premium portfolio cockpit</p>
+              <h3>Portfolio Summary</h3>
+            </div>
+            <div className="summary-pill-row">
+              <StatusBadge
+                type={summary.health.toUpperCase()}
+                variant={summary.health === 'nominal' ? 'success' : summary.health === 'watch' ? 'warning' : 'danger'}
+              />
+              <span className="status-badge glass small">{summary.topMover} mover</span>
+            </div>
           </div>
-          <div className="metric-row">
-            <MetricCard label="Total Value" value={`$${summary.totalValue.toLocaleString()}`} />
-            <MetricCard label="Today P/L" value={`${summary.todayPnL >= 0 ? '+' : '-'}$${Math.abs(summary.todayPnL).toFixed(2)}`} variant={summary.todayPnL >= 0 ? 'positive' : 'negative'} />
+
+          <div className="portfolio-main">
+            <div>
+              <div className="portfolio-value">${summary.totalValue.toLocaleString()}</div>
+              <div className={`portfolio-delta ${summary.todayPnL >= 0 ? 'positive' : 'negative'}`}>
+                {summary.todayPnL >= 0 ? '+' : '-'}${Math.abs(summary.todayPnL).toFixed(2)} Today P/L
+              </div>
+            </div>
+            <div className="portfolio-mini-graph" aria-hidden="true">
+              <div className="graph-wave" />
+            </div>
           </div>
-          <div className="metric-row">
+
+          <div className="summary-grid">
             <MetricCard label="Open P/L" value={`${summary.openPnL >= 0 ? '+' : '-'}$${Math.abs(summary.openPnL).toFixed(2)}`} variant={summary.openPnL >= 0 ? 'positive' : 'negative'} />
             <MetricCard label="Buying Power" value={`$${summary.buyingPower.toLocaleString()}`} />
+            <MetricCard label="Signal Accuracy" value={`${summary.signalAccuracy}%`} subText="Current AI confidence" variant="neutral" />
+            <MetricCard label="Active Bots" value={`${summary.activeBots}`} subText="System availability" />
           </div>
+
           <div className="summary-footer">
-            <span>Market regime: {summary.regime}</span>
-            <span>Top mover: {summary.topMover}</span>
-            <span>Recent error: {summary.recentError}</span>
+            <div className="footer-item">
+              <span>Regime</span>
+              <strong>{summary.regime}</strong>
+            </div>
+            <div className="footer-item">
+              <span>Last update</span>
+              <strong>{summary.lastUpdated}</strong>
+            </div>
+            <div className="footer-item pulse-note">
+              <span>Today P/L signal</span>
+              <strong>{summary.todayPnL >= 0 ? 'Positive' : 'Negative'}</strong>
+            </div>
           </div>
         </div>
 
-        <div className="dashboard-panel card-slim">
-          <h3>Latest Signal</h3>
+        <div className="dashboard-panel card-slim signal-module">
+          <div className="panel-heading">
+            <div>
+              <p className="micro-label">Tactical AI signal module</p>
+              <h3>Latest Signal</h3>
+            </div>
+            <span className="live-badge">LIVE</span>
+          </div>
           <SignalCard signal={signals[0]} />
         </div>
 
-        <div className="dashboard-panel card-slim">
-          <h3>Latest Catalyst</h3>
+        <div className="dashboard-panel card-slim catalyst-panel">
+          <div className="panel-heading">
+            <div>
+              <p className="micro-label">Market catalyst</p>
+              <h3>Latest Catalyst</h3>
+            </div>
+            <span className="status-badge glass">{events[0]?.tag}</span>
+          </div>
           <NewsCatalystCard event={events[0]} />
         </div>
 
-        <div className="dashboard-panel chart-card">
+        <div className="dashboard-panel chart-card chart-summary">
           <div className="panel-heading">
-            <h3>Accepted vs Rejected Signals</h3>
+            <div>
+              <p className="micro-label">Signal quality</p>
+              <h3>Accepted vs Rejected Signals</h3>
+            </div>
+            <span className="status-badge glass small">Confidence +92%</span>
           </div>
           <div className="mini-report">
             <div className="report-bar positive" style={{ width: '68%' }}>Accepted</div>

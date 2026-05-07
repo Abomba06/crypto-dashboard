@@ -13,6 +13,8 @@ export interface PortfolioSummary {
   topMover: string;
   health: 'nominal' | 'watch' | 'critical';
   recentError: string;
+  signalAccuracy: number;
+  lastUpdated: string;
 }
 
 export interface Position {
