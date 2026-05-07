@@ -2,10 +2,12 @@
 stitch.local.toml
 
 # Env files
+.env
 .env.local
+.env.*.local
+!.env.example
 
 # Node/Vite
 node_modules/
 dist/
-.env*
 .vite/
