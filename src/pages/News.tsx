@@ -5,9 +5,8 @@ import { MarketEvent } from '../types/trading';
 
 function News() {
   const [events, setEvents] = useState<MarketEvent[]>([]);
-  const [symbolFilter, setSymbolFilter] = useState('All');
-  const [sourceFilter, setSourceFilter] = useState('All');
-  const [typeFilter, setTypeFilter] = useState('All');
+  const [impactFilter, setImpactFilter] = useState('All');
+  const [confirmationFilter, setConfirmationFilter] = useState('All');
 
   useEffect(() => {
     dashboardService.getMarketEvents().then(setEvents);
@@ -15,15 +14,13 @@ function News() {
 
   const filtered = events.filter((item) => {
     return (
-      (symbolFilter === 'All' || item.symbol === symbolFilter) &&
-      (sourceFilter === 'All' || item.source === sourceFilter) &&
-      (typeFilter === 'All' || item.eventType === typeFilter)
+      (impactFilter === 'All' || item.impact === impactFilter) &&
+      (confirmationFilter === 'All' || item.confirmation === confirmationFilter)
     );
   });
 
-  const symbols = Array.from(new Set(events.map((item) => item.symbol)));
-  const sources = Array.from(new Set(events.map((item) => item.source)));
-  const types = Array.from(new Set(events.map((item) => item.eventType)));
+  const impacts = Array.from(new Set(events.map((item) => item.impact)));
+  const confirmations = Array.from(new Set(events.map((item) => item.confirmation)));
 
   return (
     <section className="page-shell">
@@ -35,22 +32,16 @@ function News() {
       </div>
 
       <div className="filters-row">
-        <select value={symbolFilter} onChange={(e) => setSymbolFilter(e.target.value)}>
+        <select value={impactFilter} onChange={(e) => setImpactFilter(e.target.value)}>
           <option>All</option>
-          {symbols.map((symbol) => (
-            <option key={symbol}>{symbol}</option>
+          {impacts.map((impact) => (
+            <option key={impact}>{impact}</option>
           ))}
         </select>
-        <select value={sourceFilter} onChange={(e) => setSourceFilter(e.target.value)}>
+        <select value={confirmationFilter} onChange={(e) => setConfirmationFilter(e.target.value)}>
           <option>All</option>
-          {sources.map((source) => (
-            <option key={source}>{source}</option>
-          ))}
-        </select>
-        <select value={typeFilter} onChange={(e) => setTypeFilter(e.target.value)}>
-          <option>All</option>
-          {types.map((type) => (
-            <option key={type}>{type}</option>
+          {confirmations.map((confirmation) => (
+            <option key={confirmation}>{confirmation}</option>
           ))}
         </select>
       </div>

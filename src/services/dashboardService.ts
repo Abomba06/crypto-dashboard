@@ -44,6 +44,7 @@ const mapAccountSnapshot = (row: AccountSnapshot): typeof portfolioSummary => ({
 });
 
 const mapPosition = (row: Position): typeof positions[0] => ({
+  id: row.id,
   symbol: row.symbol,
   name: row.name,
   price: row.price,
@@ -56,6 +57,8 @@ const mapPosition = (row: Position): typeof positions[0] => ({
   tp1: row.tp1,
   tp2: row.tp2,
   sparkline: row.sparkline,
+  createdAt: row.created_at,
+  updatedAt: row.updated_at,
 });
 
 const mapSignal = (row: Signal): typeof signals[0] => ({
@@ -70,6 +73,7 @@ const mapSignal = (row: Signal): typeof signals[0] => ({
   reason: row.reason,
   status: row.status,
   createdAt: row.created_at,
+  updatedAt: row.updated_at,
 });
 
 const mapMarketEvent = (row: MarketEvent): typeof marketEvents[0] => ({
@@ -80,39 +84,50 @@ const mapMarketEvent = (row: MarketEvent): typeof marketEvents[0] => ({
   sentiment: row.sentiment,
   confirmation: row.confirmation,
   timestamp: row.timestamp,
+  createdAt: row.created_at,
 });
 
 const mapTrade = (row: Trade): typeof trades[0] => ({
   id: row.id,
-  symbol: row.symbol,
-  side: row.side,
-  quantity: row.quantity,
-  price: row.price,
   timestamp: row.timestamp,
-  pnl: row.pnl,
+  symbol: row.symbol,
+  action: row.side,
+  price: row.price,
+  avgEntry: row.price,
+  stop: Math.round(row.price * 0.98),
+  tp1: Math.round(row.price * 1.01),
+  tp2: Math.round(row.price * 1.02),
+  quantity: row.quantity,
+  score: 0,
+  confidence: 0.5,
+  sentiment: 'neutral',
+  reason: row.pnl !== null ? `PnL: ${row.pnl}` : 'Executed trade',
+  note: `order_id=${row.id}; side=${row.side};`,
 });
 
 const mapBotLog = (row: BotLog): typeof logs[0] => ({
   id: row.id,
-  level: row.level,
-  message: row.message,
   timestamp: row.timestamp,
+  severity: row.level,
+  message: row.message,
 });
 
 const mapBotState = (row: BotState): typeof botState => ({
+  id: row.id,
   status: row.status,
   lastActive: row.last_active,
   uptime: row.uptime,
   version: row.version,
+  createdAt: row.created_at,
+  updatedAt: row.updated_at,
 });
 
 const mapResearchReport = (row: ResearchReport): typeof researchReports[0] => ({
   id: row.id,
-  title: row.title,
+  name: row.title,
   summary: row.summary,
-  content: row.content,
-  author: row.author,
-  timestamp: row.timestamp,
+  metrics: {},
+  notes: row.content,
 });
 
 // Service with Supabase integration and mock fallbacks
@@ -321,125 +336,112 @@ export const dashboardService = {
 
   // Realtime subscriptions
   subscribeToPortfolioSummary(callback: (data: typeof portfolioSummary) => void) {
-    const channel = supabase
-      .channel('account_snapshots_changes')
-      .on(
-        'postgres_changes',
-        {
-          event: '*',
-          schema: 'public',
-          table: 'account_snapshots',
-        },
-        (payload: any) => {
-          if (payload.new) {
-            callback(mapAccountSnapshot(payload.new));
-          }
+    const channel = supabase.channel('account_snapshots_changes').on(
+      'postgres_changes',
+      {
+        event: '*',
+        schema: 'public',
+        table: 'account_snapshots',
+      },
+      (payload: any) => {
+        if (payload.new) {
+          callback(mapAccountSnapshot(payload.new));
         }
-      )
-      .subscribe();
+      }
+    );
 
+    channel.subscribe();
     return channel;
   },
 
   subscribeToPositions(callback: (data: typeof positions) => void) {
-    const channel = supabase
-      .channel('positions_changes')
-      .on(
-        'postgres_changes',
-        {
-          event: '*',
-          schema: 'public',
-          table: 'positions',
-        },
-        async () => {
-          // Refetch all positions on any change
-          const positions = await dashboardService.getPositions();
-          callback(positions);
-        }
-      )
-      .subscribe();
+    const channel = supabase.channel('positions_changes').on(
+      'postgres_changes',
+      {
+        event: '*',
+        schema: 'public',
+        table: 'positions',
+      },
+      async () => {
+        const positions = await dashboardService.getPositions();
+        callback(positions);
+      }
+    );
 
+    channel.subscribe();
     return channel;
   },
 
   subscribeToTrades(callback: (data: typeof trades) => void) {
-    const channel = supabase
-      .channel('trades_changes')
-      .on(
-        'postgres_changes',
-        {
-          event: '*',
-          schema: 'public',
-          table: 'trades',
-        },
-        async () => {
-          const trades = await dashboardService.getTrades();
-          callback(trades);
-        }
-      )
-      .subscribe();
+    const channel = supabase.channel('trades_changes').on(
+      'postgres_changes',
+      {
+        event: '*',
+        schema: 'public',
+        table: 'trades',
+      },
+      async () => {
+        const trades = await dashboardService.getTrades();
+        callback(trades);
+      }
+    );
 
+    channel.subscribe();
     return channel;
   },
 
   subscribeToSignals(callback: (data: typeof signals) => void) {
-    const channel = supabase
-      .channel('signals_changes')
-      .on(
-        'postgres_changes',
-        {
-          event: '*',
-          schema: 'public',
-          table: 'signals',
-        },
-        async () => {
-          const signals = await dashboardService.getSignals();
-          callback(signals);
-        }
-      )
-      .subscribe();
+    const channel = supabase.channel('signals_changes').on(
+      'postgres_changes',
+      {
+        event: '*',
+        schema: 'public',
+        table: 'signals',
+      },
+      async () => {
+        const signals = await dashboardService.getSignals();
+        callback(signals);
+      }
+    );
 
+    channel.subscribe();
     return channel;
   },
 
   subscribeToLogs(callback: (data: typeof logs) => void) {
-    const channel = supabase
-      .channel('bot_logs_changes')
-      .on(
-        'postgres_changes',
-        {
-          event: '*',
-          schema: 'public',
-          table: 'bot_logs',
-        },
-        async () => {
-          const logs = await dashboardService.getLogs();
-          callback(logs);
-        }
-      )
-      .subscribe();
+    const channel = supabase.channel('bot_logs_changes').on(
+      'postgres_changes',
+      {
+        event: '*',
+        schema: 'public',
+        table: 'bot_logs',
+      },
+      async () => {
+        const logs = await dashboardService.getLogs();
+        callback(logs);
+      }
+    );
 
+    channel.subscribe();
     return channel;
   },
 
   subscribeToBotState(callback: (data: typeof botState) => void) {
-    const channel = supabase
-      .channel('bot_state_changes')
-      .on(
-        'postgres_changes',
-        {
-          event: '*',
-          schema: 'public',
-          table: 'bot_state',
-        },
-        (payload: any) => {
-          if (payload.new) {
-            callback(mapBotState(payload.new));
-          }
+    const channel = supabase.channel('bot_state_changes').on(
+      'postgres_changes',
+      {
+        event: '*',
+        schema: 'public',
+        table: 'bot_state',
+      },
+      (payload: any) => {
+        if (payload.new) {
+          callback(mapBotState(payload.new));
         }
-      )
-      .subscribe();
+      }
+    );
 
+    channel.subscribe();
     return channel;
   },
 };

@@ -63,74 +63,6 @@ export interface MarketEvent {
 
 export interface Trade {
   id: string;
-  symbol: string;
-  side: 'buy' | 'sell';
-  quantity: number;
-  price: number;
-  timestamp: string;
-  pnl: number | null;
-  createdAt: string;
-}
-
-export interface LogEntry {
-  id: string;
-  level: 'info' | 'warn' | 'error';
-  message: string;
-  timestamp: string;
-  createdAt: string;
-}
-
-export interface EvaluationRecord {
-  id: string;
-  signalId: string;
-  evaluation: string;
-  score: number;
-  type: 'candidate' | 'rejected';
-  createdAt: string;
-}
-
-export interface ResearchReport {
-  id: string;
-  title: string;
-  summary: string;
-  content: string;
-  author: string;
-  timestamp: string;
-  createdAt: string;
-}
-
-export interface VariantReport {
-  id: string;
-  title: string;
-  summary: string;
-  content: string;
-  author: string;
-  timestamp: string;
-  createdAt: string;
-}
-
-export interface ComparisonReport {
-  id: string;
-  title: string;
-  summary: string;
-  content: string;
-  author: string;
-  timestamp: string;
-  createdAt: string;
-}
-
-export interface BotState {
-  id: string;
-  status: 'running' | 'paused' | 'stopped';
-  lastActive: string;
-  uptime: number;
-  version: string;
-  createdAt: string;
-  updatedAt: string;
-}
-
-export interface Trade {
-  id: string;
   timestamp: string;
   symbol: string;
   action: 'buy' | 'sell';
@@ -194,11 +126,11 @@ export interface ComparisonReport {
 }
 
 export interface BotState {
-  openPositions: string[];
-  watchedSymbols: string[];
-  cooldowns: Record<string, string>;
-  lastSignalTimes: Record<string, string>;
-  riskState: string;
-  lastEvents: string[];
-  raw: Record<string, unknown>;
+  id: string;
+  status: 'running' | 'paused' | 'stopped';
+  lastActive: string;
+  uptime: number;
+  version: string;
+  createdAt: string;
+  updatedAt: string;
 }

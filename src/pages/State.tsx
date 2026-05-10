@@ -25,9 +25,17 @@ function State() {
     loadData();
 
     // Subscribe to realtime bot state updates
-    const unsubscribe = dashboardService.subscribeToBotState(setState);
+    let unsubscribe: any;
+    const subscribe = async () => {
+      unsubscribe = await dashboardService.subscribeToBotState(setState);
+    };
+    subscribe();
 
-    return () => unsubscribe.unsubscribe();
+    return () => {
+      if (unsubscribe?.unsubscribe) {
+        void unsubscribe.unsubscribe();
+      }
+    };
   }, []);
 
   if (loading) {

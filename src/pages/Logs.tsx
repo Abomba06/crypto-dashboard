@@ -25,9 +25,17 @@ function Logs() {
     loadData();
 
     // Subscribe to realtime log updates
-    const unsubscribe = dashboardService.subscribeToLogs(setLogs);
+    let unsubscribe: any;
+    const subscribe = async () => {
+      unsubscribe = await dashboardService.subscribeToLogs(setLogs);
+    };
+    subscribe();
 
-    return () => unsubscribe.unsubscribe();
+    return () => {
+      if (unsubscribe?.unsubscribe) {
+        void unsubscribe.unsubscribe();
+      }
+    };
   }, []);
 
   if (loading) {

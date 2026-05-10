@@ -1,22 +1,18 @@
 import React, { useEffect, useState } from 'react';
 import { dashboardService } from '../services/dashboardService';
-import { loadStitchScreen } from '../services/stitchService';
 import { MetricCard } from '../components/MetricCard';
 import { PositionCard } from '../components/PositionCard';
 import { NewsCatalystCard } from '../components/NewsCatalystCard';
 import { SignalCard } from '../components/SignalCard';
 import { StatusBadge } from '../components/StatusBadge';
-
-const useStitch = import.meta.env.VITE_USE_STITCH === 'true';
+import { MarketEvent, PortfolioSummary, Position, Signal, Trade } from '../types/trading';
 
 function Dashboard() {
-  const [summary, setSummary] = useState<any>(null);
-  const [positions, setPositions] = useState<any[]>([]);
-  const [signals, setSignals] = useState<any[]>([]);
-  const [events, setEvents] = useState<any[]>([]);
-  const [trades, setTrades] = useState<any[]>([]);
-  const [stitchLayout, setStitchLayout] = useState<any>(null);
-  const [stitchError, setStitchError] = useState<string>('');
+  const [summary, setSummary] = useState<PortfolioSummary | null>(null);
+  const [positions, setPositions] = useState<Position[]>([]);
+  const [signals, setSignals] = useState<Signal[]>([]);
+  const [events, setEvents] = useState<MarketEvent[]>([]);
+  const [trades, setTrades] = useState<Trade[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string>('');
 
@@ -39,15 +35,6 @@ function Dashboard() {
         setSignals(signalsData);
         setEvents(eventsData);
         setTrades(tradesData);
-
-        if (useStitch) {
-          try {
-            const stitchData = await loadStitchScreen('dashboard');
-            setStitchLayout(stitchData);
-          } catch (stitchErr: any) {
-            setStitchError(stitchErr.message);
-          }
-        }
       } catch (err: any) {
         setError(err.message || 'Failed to load dashboard data');
       } finally {
@@ -56,44 +43,13 @@ function Dashboard() {
     };
 
     loadData();
-
-    // Set up realtime subscriptions
-    const unsubSummary = dashboardService.subscribeToPortfolioSummary(setSummary);
-    const unsubPositions = dashboardService.subscribeToPositions(setPositions);
-    const unsubSignals = dashboardService.subscribeToSignals(setSignals);
-    const unsubTrades = dashboardService.subscribeToTrades(setTrades);
-
-    return () => {
-      unsubSummary.unsubscribe();
-      unsubPositions.unsubscribe();
-      unsubSignals.unsubscribe();
-      unsubTrades.unsubscribe();
-    };
   }, []);
-
-  if (useStitch && stitchLayout) {
-    return (
-      <section className="page-shell">
-        <div className="dashboard-panel card-slim">
-          <div className="panel-heading">
-            <h2>Stitch Remote UI</h2>
-          </div>
-          <pre style={{ color: '#cbd5e1', whiteSpace: 'pre-wrap' }}>{JSON.stringify(stitchLayout, null, 2)}</pre>
-        </div>
-      </section>
-    );
-  }
 
   if (loading) {
     return (
       <section className="page-shell">
-        <div className="dashboard-panel card-slim">
-          <div className="panel-heading">
-            <h2>Loading Dashboard...</h2>
-          </div>
-          <div style={{ textAlign: 'center', padding: '2rem', color: '#94a3b8' }}>
-            Connecting to Supabase and loading data...
-          </div>
+        <div style={{ textAlign: 'center', padding: '2rem', color: '#94a3b8' }}>
+          Loading dashboard...
         </div>
       </section>
     );
@@ -102,20 +58,8 @@ function Dashboard() {
   if (error) {
     return (
       <section className="page-shell">
-        <div className="dashboard-panel card-slim">
-          <div className="panel-heading">
-            <h2>Dashboard Error</h2>
-          </div>
-          <div style={{ textAlign: 'center', padding: '2rem', color: '#f87171' }}>
-            {error}
-            <br />
-            <button
-              onClick={() => window.location.reload()}
-              style={{ marginTop: '1rem', padding: '0.5rem 1rem', background: '#3b82f6', color: 'white', border: 'none', borderRadius: '0.5rem' }}
-            >
-              Retry
-            </button>
-          </div>
+        <div style={{ textAlign: 'center', padding: '2rem', color: '#ef4444' }}>
+          Error: {error}
         </div>
       </section>
     );
@@ -124,13 +68,8 @@ function Dashboard() {
   if (!summary) {
     return (
       <section className="page-shell">
-        <div className="dashboard-panel card-slim">
-          <div className="panel-heading">
-            <h2>No Data Available</h2>
-          </div>
-          <div style={{ textAlign: 'center', padding: '2rem', color: '#94a3b8' }}>
-            No portfolio data found. Using mock data as fallback.
-          </div>
+        <div style={{ textAlign: 'center', padding: '2rem', color: '#94a3b8' }}>
+          No portfolio data available
         </div>
       </section>
     );
@@ -138,84 +77,59 @@ function Dashboard() {
 
   return (
     <section className="page-shell">
-      <div className="dashboard-topbar">
-        <div>
-          <p className="micro-label header-caption">AI Trading OS • Live Crypto Command Center</p>
-          <h2>Operational Console</h2>
-        </div>
-        <div className="topbar-status">
-          <span className="status-pill live">Live Sync</span>
-          <span className="status-pill">Bot Health: {summary.health}</span>
-          <span className="status-pill secondary">Market regime: {summary.regime}</span>
-        </div>
-      </div>
-
       <div className="dashboard-grid">
-        <div className="dashboard-panel dashboard-summary">
-          <div className="panel-heading summary-heading">
-            <div>
-              <p className="micro-label">Premium portfolio cockpit</p>
-              <h3>Portfolio Summary</h3>
-            </div>
-            <div className="summary-pill-row">
-              <StatusBadge
-                type={summary.health.toUpperCase()}
-                variant={summary.health === 'nominal' ? 'success' : summary.health === 'watch' ? 'warning' : 'danger'}
-              />
-              <span className="status-badge glass small">{summary.topMover} mover</span>
-            </div>
-          </div>
-
-          <div className="portfolio-main">
-            <div>
-              <div className="portfolio-value">${summary.totalValue.toLocaleString()}</div>
-              <div className={`portfolio-delta ${summary.todayPnL >= 0 ? 'positive' : 'negative'}`}>
-                {summary.todayPnL >= 0 ? '+' : '-'}${Math.abs(summary.todayPnL).toFixed(2)} Today P/L
-              </div>
-            </div>
-            <div className="portfolio-mini-graph" aria-hidden="true">
-              <div className="graph-wave" />
-            </div>
-          </div>
-
-          <div className="summary-grid">
-            <MetricCard label="Open P/L" value={`${summary.openPnL >= 0 ? '+' : '-'}$${Math.abs(summary.openPnL).toFixed(2)}`} variant={summary.openPnL >= 0 ? 'positive' : 'negative'} />
-            <MetricCard label="Buying Power" value={`$${summary.buyingPower.toLocaleString()}`} />
-            <MetricCard label="Signal Accuracy" value={`${summary.signalAccuracy}%`} subText="Current AI confidence" variant="neutral" />
-            <MetricCard label="Active Bots" value={`${summary.activeBots || 1}`} subText="System availability" />
-          </div>
-
-          <div className="summary-footer">
-            <div className="footer-item">
-              <span>Regime</span>
-              <strong>{summary.regime}</strong>
-            </div>
-            <div className="footer-item">
-              <span>Last update</span>
-              <strong>{summary.lastUpdated}</strong>
-            </div>
-            <div className="footer-item pulse-note">
-              <span>Today P/L signal</span>
-              <strong>{summary.todayPnL >= 0 ? 'Positive' : 'Negative'}</strong>
-            </div>
-          </div>
-        </div>
-
-        <div className="dashboard-panel card-slim signal-module">
+        <div className="dashboard-panel card-slim summary-panel">
           <div className="panel-heading">
             <div>
-              <p className="micro-label">Tactical AI signal module</p>
-              <h3>Latest Signal</h3>
+              <p className="micro-label">Portfolio value</p>
+              <h3>${summary.totalValue.toLocaleString()}</h3>
             </div>
-            <span className="live-badge">LIVE</span>
+            <StatusBadge type={summary.regime} variant="neutral" />
           </div>
-          {signals.length > 0 ? (
-            <SignalCard signal={signals[0]} />
-          ) : (
-            <div style={{ textAlign: 'center', padding: '2rem', color: '#94a3b8' }}>
-              No signals available
+          <div className="metric-grid">
+            <MetricCard
+              label="Open P&L"
+              value={`${summary.openPnL >= 0 ? '+' : ''}$${summary.openPnL.toLocaleString()}`}
+              variant={summary.openPnL >= 0 ? 'positive' : 'negative'}
+            />
+            <MetricCard
+              label="Today PnL"
+              value={`${summary.todayPnL >= 0 ? '+' : ''}${summary.todayPnL.toFixed(2)}%`}
+              variant={summary.todayPnL >= 0 ? 'positive' : 'negative'}
+            />
+            <MetricCard label="Buying Power" value={`$${summary.buyingPower.toLocaleString()}`} />
+            <MetricCard label="Daily Loss Limit" value={`$${summary.dailyLossLimit.toLocaleString()}`} />
+          </div>
+        </div>
+
+        <div className="dashboard-panel positions-panel">
+          <div className="panel-heading">
+            <div>
+              <p className="micro-label">Open positions</p>
+              <h3>{positions.length} Active</h3>
             </div>
-          )}
+          </div>
+          <div className="positions-list">
+            {positions.slice(0, 3).map((position) => (
+              <PositionCard key={position.id} position={position} />
+            ))}
+            {positions.length === 0 && <div className="empty-state">No open positions</div>}
+          </div>
+        </div>
+
+        <div className="dashboard-panel signals-panel">
+          <div className="panel-heading">
+            <div>
+              <p className="micro-label">Trading signals</p>
+              <h3>{signals.length} Active</h3>
+            </div>
+          </div>
+          <div className="signals-list">
+            {signals.slice(0, 2).map((signal) => (
+              <SignalCard key={signal.id} signal={signal} />
+            ))}
+            {signals.length === 0 && <div className="empty-state">No active signals</div>}
+          </div>
         </div>
 
         <div className="dashboard-panel card-slim catalyst-panel">
@@ -224,60 +138,37 @@ function Dashboard() {
               <p className="micro-label">Market catalyst</p>
               <h3>Latest Catalyst</h3>
             </div>
-            <span className="status-badge glass">{events[0]?.impact || 'N/A'}</span>
+            <StatusBadge type={events[0]?.sentiment || 'neutral'} variant="neutral" />
           </div>
           {events.length > 0 ? (
-            <NewsCatalystCard event={events[0]} />
+            <NewsCatalystCard event={events[0]} compact />
           ) : (
-            <div style={{ textAlign: 'center', padding: '2rem', color: '#94a3b8' }}>
-              No market events available
-            </div>
+            <div className="empty-state">No market events available</div>
           )}
         </div>
 
-        <div className="dashboard-panel chart-card chart-summary">
+        <div className="dashboard-panel trades-panel">
           <div className="panel-heading">
             <div>
-              <p className="micro-label">Signal quality</p>
-              <h3>Accepted vs Rejected Signals</h3>
+              <p className="micro-label">Recent trades</p>
+              <h3>Last 24h</h3>
             </div>
-            <span className="status-badge glass small">Confidence +{summary.signalAccuracy}%</span>
           </div>
-          <div className="mini-report">
-            <div className="report-bar positive" style={{ width: '68%' }}>Accepted</div>
-            <div className="report-bar negative" style={{ width: '32%' }}>Rejected</div>
-          </div>
-          <div className="panel-note">Signal quality remains strong in the current regime.</div>
-        </div>
-
-        <div className="dashboard-panel positions-preview">
-          <div className="panel-heading"><h3>Active Positions</h3></div>
-          {positions.length > 0 ? (
-            positions.slice(0, 2).map((position) => (
-              <PositionCard position={position} key={position.symbol} />
-            ))
-          ) : (
-            <div style={{ textAlign: 'center', padding: '2rem', color: '#94a3b8' }}>
-              No active positions
-            </div>
-          )}
-        </div>
-
-        <div className="dashboard-panel trades-preview">
-          <div className="panel-heading"><h3>Recent Trades</h3></div>
-          {trades.length > 0 ? (
-            trades.slice(0, 2).map((trade) => (
-              <div className="trade-preview-row" key={trade.id}>
-                <div>{trade.symbol}</div>
-                <div>{trade.side.toUpperCase()}</div>
-                <div>{trade.price}</div>
+          <div className="trades-list">
+            {trades.slice(0, 5).map((trade) => (
+              <div key={trade.id} className="trade-item">
+                <div className="trade-row">
+                  <strong>{trade.symbol}</strong>
+                  <span className={`trade-side ${trade.action}`}>{trade.action.toUpperCase()}</span>
+                </div>
+                <div className="trade-details">
+                  <span>${trade.price.toLocaleString()}</span>
+                  <span>{trade.quantity}</span>
+                </div>
               </div>
-            ))
-          ) : (
-            <div style={{ textAlign: 'center', padding: '2rem', color: '#94a3b8' }}>
-              No recent trades
-            </div>
-          )}
+            ))}
+            {trades.length === 0 && <div className="empty-state">No recent trades</div>}
+          </div>
         </div>
       </div>
     </section>

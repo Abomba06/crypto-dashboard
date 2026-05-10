@@ -30,9 +30,17 @@ function Signals() {
     loadData();
 
     // Subscribe to realtime updates
-    const unsubscribe = dashboardService.subscribeToSignals(setSignals);
+    let unsubscribe: any;
+    const subscribe = async () => {
+      unsubscribe = await dashboardService.subscribeToSignals(setSignals);
+    };
+    subscribe();
 
-    return () => unsubscribe.unsubscribe();
+    return () => {
+      if (unsubscribe?.unsubscribe) {
+        void unsubscribe.unsubscribe();
+      }
+    };
   }, []);
 
   const filtered = useMemo(() => {

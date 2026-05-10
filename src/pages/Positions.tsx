@@ -24,9 +24,17 @@ function Positions() {
     loadData();
 
     // Subscribe to realtime updates
-    const unsubscribe = dashboardService.subscribeToPositions(setPositions);
+    let unsubscribe: any;
+    const subscribe = async () => {
+      unsubscribe = await dashboardService.subscribeToPositions(setPositions);
+    };
+    subscribe();
 
-    return () => unsubscribe.unsubscribe();
+    return () => {
+      if (unsubscribe?.unsubscribe) {
+        void unsubscribe.unsubscribe();
+      }
+    };
   }, []);
 
   if (loading) {

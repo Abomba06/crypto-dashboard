@@ -4,27 +4,25 @@ import { StatusBadge } from './StatusBadge';
 
 interface NewsCatalystCardProps {
   event: MarketEvent;
+  compact?: boolean;
 }
 
-export function NewsCatalystCard({ event }: NewsCatalystCardProps) {
+export function NewsCatalystCard({ event, compact = false }: NewsCatalystCardProps) {
   return (
     <article className="news-card">
       <div className="news-tag-row">
-        <StatusBadge type={event.tag} variant={event.tag === 'Bearish' ? 'danger' : event.tag === 'Bullish' ? 'success' : 'purple'} />
-        <span className="news-source">{event.source}</span>
+        <StatusBadge
+          type={event.sentiment}
+          variant={event.sentiment === 'bearish' ? 'danger' : event.sentiment === 'bullish' ? 'success' : 'purple'}
+        />
+        <span className="news-source">{event.impact}</span>
       </div>
-      <h3>{event.headline}</h3>
+      <h3>{event.title}</h3>
       <div className="news-meta">
-        <span>{event.symbol}</span>
-        <span>{event.eventType}</span>
-        <span>{event.predictedType}</span>
+        <span>{event.confirmation}</span>
+        {!compact ? <span>{event.timestamp}</span> : null}
       </div>
-      <div className="news-stats">
-        <span>Prob {Math.round(event.probability * 100)}%</span>
-        <span>Sent {event.sentimentScore.toFixed(2)}</span>
-        <span>Rel {event.relevance.toFixed(2)}</span>
-      </div>
-      <div className="news-action">{event.action}</div>
+      <div className="news-description">{event.description}</div>
     </article>
   );
 }
