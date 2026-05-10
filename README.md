@@ -24,6 +24,4 @@ The app reads from Supabase and falls back to mock data when live data is unavai
 
 ## Supabase Tables
 
-Fastest setup: paste and run [supabase/complete_setup.sql](supabase/complete_setup.sql) in the Supabase SQL editor. It creates the tables, enables read policies, and inserts starter rows for every screen.
-
-The split files are also available if you prefer them: [supabase/schema.sql](supabase/schema.sql) creates tables/policies, and [supabase/seed.sql](supabase/seed.sql) adds starter rows. The app reads these tables with the publishable key and falls back to mock data if the tables are missing or empty.
+Run [supabase/schema.sql](supabase/schema.sql) in the Supabase SQL editor for the project used by the app. You can also run [supabase/seed.sql](supabase/seed.sql) to add starter rows. The app reads these tables with the publishable key and falls back to mock data if the tables are missing or empty.
