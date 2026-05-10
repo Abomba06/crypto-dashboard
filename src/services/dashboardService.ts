@@ -1,4 +1,4 @@
-import { supabase } from '../utils/supabase/client';
+import { hasSupabaseConfig, supabase } from '../utils/supabase/client';
 import {
   portfolioSummary,
   positions,
@@ -27,6 +27,12 @@ import {
   ResearchReport,
   RealtimePayload,
 } from '../types/supabase';
+
+const noOpSubscription = {
+  unsubscribe: () => undefined,
+};
+
+const canReadSupabase = () => hasSupabaseConfig && supabase !== null;
 
 // Helper to convert Supabase row to app format
 const mapAccountSnapshot = (row: AccountSnapshot): typeof portfolioSummary => ({
@@ -134,8 +140,10 @@ const mapResearchReport = (row: ResearchReport): typeof researchReports[0] => ({
 export const dashboardService = {
   // Portfolio Summary
   async getPortfolioSummary(): Promise<typeof portfolioSummary> {
+    if (!canReadSupabase()) return portfolioSummary;
+
     try {
-      const { data, error } = await supabase
+      const { data, error } = await supabase!
         .from('account_snapshots')
         .select('*')
         .order('updated_at', { ascending: false })
@@ -156,8 +164,10 @@ export const dashboardService = {
 
   // Positions
   async getPositions(): Promise<typeof positions> {
+    if (!canReadSupabase()) return positions;
+
     try {
-      const { data, error } = await supabase
+      const { data, error } = await supabase!
         .from('positions')
         .select('*')
         .order('updated_at', { ascending: false });
@@ -176,8 +186,10 @@ export const dashboardService = {
 
   // Signals
   async getSignals(): Promise<typeof signals> {
+    if (!canReadSupabase()) return signals;
+
     try {
-      const { data, error } = await supabase
+      const { data, error } = await supabase!
         .from('signals')
         .select('*')
         .order('created_at', { ascending: false })
@@ -197,8 +209,10 @@ export const dashboardService = {
 
   // Market Events
   async getMarketEvents(): Promise<typeof marketEvents> {
+    if (!canReadSupabase()) return marketEvents;
+
     try {
-      const { data, error } = await supabase
+      const { data, error } = await supabase!
         .from('market_events')
         .select('*')
         .order('timestamp', { ascending: false })
@@ -218,8 +232,10 @@ export const dashboardService = {
 
   // Trades
   async getTrades(): Promise<typeof trades> {
+    if (!canReadSupabase()) return trades;
+
     try {
-      const { data, error } = await supabase
+      const { data, error } = await supabase!
         .from('trades')
         .select('*')
         .order('timestamp', { ascending: false })
@@ -239,8 +255,10 @@ export const dashboardService = {
 
   // Bot Logs
   async getLogs(): Promise<typeof logs> {
+    if (!canReadSupabase()) return logs;
+
     try {
-      const { data, error } = await supabase
+      const { data, error } = await supabase!
         .from('bot_logs')
         .select('*')
         .order('timestamp', { ascending: false })
@@ -260,10 +278,12 @@ export const dashboardService = {
 
   // Evaluations (combining candidate and rejected)
   async getEvaluations(): Promise<typeof evaluations> {
+    if (!canReadSupabase()) return evaluations;
+
     try {
       const [candidatesRes, rejectedRes] = await Promise.all([
-        supabase.from('candidate_evaluations').select('*').order('created_at', { ascending: false }).limit(25),
-        supabase.from('rejected_signal_evaluations').select('*').order('created_at', { ascending: false }).limit(25),
+        supabase!.from('candidate_evaluations').select('*').order('created_at', { ascending: false }).limit(25),
+        supabase!.from('rejected_signal_evaluations').select('*').order('created_at', { ascending: false }).limit(25),
       ]);
 
       if (candidatesRes.error || rejectedRes.error) {
@@ -287,8 +307,10 @@ export const dashboardService = {
 
   // Research Reports
   async getResearchReports(): Promise<typeof researchReports> {
+    if (!canReadSupabase()) return researchReports;
+
     try {
-      const { data, error } = await supabase
+      const { data, error } = await supabase!
         .from('research_reports')
         .select('*')
         .order('timestamp', { ascending: false })
@@ -314,8 +336,10 @@ export const dashboardService = {
 
   // Bot State
   async getBotState(): Promise<typeof botState> {
+    if (!canReadSupabase()) return botState;
+
     try {
-      const { data, error } = await supabase
+      const { data, error } = await supabase!
         .from('bot_state')
         .select('*')
         .order('updated_at', { ascending: false })
@@ -336,7 +360,9 @@ export const dashboardService = {
 
   // Realtime subscriptions
   subscribeToPortfolioSummary(callback: (data: typeof portfolioSummary) => void) {
-    const channel = supabase.channel('account_snapshots_changes').on(
+    if (!canReadSupabase()) return noOpSubscription;
+
+    const channel = supabase!.channel('account_snapshots_changes').on(
       'postgres_changes',
       {
         event: '*',
@@ -355,7 +381,9 @@ export const dashboardService = {
   },
 
   subscribeToPositions(callback: (data: typeof positions) => void) {
-    const channel = supabase.channel('positions_changes').on(
+    if (!canReadSupabase()) return noOpSubscription;
+
+    const channel = supabase!.channel('positions_changes').on(
       'postgres_changes',
       {
         event: '*',
@@ -373,7 +401,9 @@ export const dashboardService = {
   },
 
   subscribeToTrades(callback: (data: typeof trades) => void) {
-    const channel = supabase.channel('trades_changes').on(
+    if (!canReadSupabase()) return noOpSubscription;
+
+    const channel = supabase!.channel('trades_changes').on(
       'postgres_changes',
       {
         event: '*',
@@ -391,7 +421,9 @@ export const dashboardService = {
   },
 
   subscribeToSignals(callback: (data: typeof signals) => void) {
-    const channel = supabase.channel('signals_changes').on(
+    if (!canReadSupabase()) return noOpSubscription;
+
+    const channel = supabase!.channel('signals_changes').on(
       'postgres_changes',
       {
         event: '*',
@@ -409,7 +441,9 @@ export const dashboardService = {
   },
 
   subscribeToLogs(callback: (data: typeof logs) => void) {
-    const channel = supabase.channel('bot_logs_changes').on(
+    if (!canReadSupabase()) return noOpSubscription;
+
+    const channel = supabase!.channel('bot_logs_changes').on(
       'postgres_changes',
       {
         event: '*',
@@ -427,7 +461,9 @@ export const dashboardService = {
   },
 
   subscribeToBotState(callback: (data: typeof botState) => void) {
-    const channel = supabase.channel('bot_state_changes').on(
+    if (!canReadSupabase()) return noOpSubscription;
+
+    const channel = supabase!.channel('bot_state_changes').on(
       'postgres_changes',
       {
         event: '*',
