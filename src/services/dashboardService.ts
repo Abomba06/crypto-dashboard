@@ -147,6 +147,34 @@ const mapResearchReport = (row: ResearchReport): typeof researchReports[0] => ({
   notes: row.content,
 });
 
+const mapCandidateEvaluation = (row: CandidateEvaluation): typeof evaluations[0] => ({
+  id: row.id,
+  symbol: row.signal_id,
+  eventType: 'candidate',
+  status: 'accepted',
+  rejectionReason: '',
+  forwardReturn: row.score,
+  mfe: row.score,
+  mae: 0,
+  tp1Hit: row.score >= 0,
+  stopHit: false,
+  sentiment: row.score,
+});
+
+const mapRejectedEvaluation = (row: RejectedSignalEvaluation): typeof evaluations[0] => ({
+  id: row.id,
+  symbol: row.signal_id,
+  eventType: 'rejected',
+  status: 'rejected',
+  rejectionReason: row.reason,
+  forwardReturn: 0,
+  mfe: 0,
+  mae: 0,
+  tp1Hit: false,
+  stopHit: false,
+  sentiment: 0,
+});
+
 // Service with Supabase integration and mock fallbacks
 export const dashboardService = {
   async getDataSourceStatus(): Promise<DataSourceStatus> {
@@ -354,8 +382,8 @@ export const dashboardService = {
         return evaluations;
       }
 
-      const candidates = candidatesRes.data?.map(c => ({ ...c, type: 'candidate' as const })) || [];
-      const rejected = rejectedRes.data?.map(r => ({ ...r, type: 'rejected' as const })) || [];
+      const candidates = candidatesRes.data?.map(mapCandidateEvaluation) || [];
+      const rejected = rejectedRes.data?.map(mapRejectedEvaluation) || [];
 
       if (candidates.length === 0 && rejected.length === 0) {
         return evaluations;
