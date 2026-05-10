@@ -33,6 +33,17 @@ const noOpSubscription = {
 };
 
 const canReadSupabase = () => hasSupabaseConfig && supabase !== null;
+const missingTableMessage = 'Could not find the table';
+
+export type DataSourceStatus = {
+  configured: boolean;
+  connected: boolean;
+  usingMockFallback: boolean;
+  message: string;
+};
+
+const isMissingTableError = (error: { message?: string } | null | undefined) =>
+  Boolean(error?.message?.includes(missingTableMessage));
 
 // Helper to convert Supabase row to app format
 const mapAccountSnapshot = (row: AccountSnapshot): typeof portfolioSummary => ({
@@ -138,6 +149,58 @@ const mapResearchReport = (row: ResearchReport): typeof researchReports[0] => ({
 
 // Service with Supabase integration and mock fallbacks
 export const dashboardService = {
+  async getDataSourceStatus(): Promise<DataSourceStatus> {
+    if (!canReadSupabase()) {
+      return {
+        configured: false,
+        connected: false,
+        usingMockFallback: true,
+        message: 'Missing EXPO_PUBLIC_SUPABASE_URL or EXPO_PUBLIC_SUPABASE_PUBLISHABLE_KEY. Showing mock data.',
+      };
+    }
+
+    try {
+      const { data, error } = await supabase!
+        .from('account_snapshots')
+        .select('id')
+        .limit(1);
+
+      if (error) {
+        return {
+          configured: true,
+          connected: false,
+          usingMockFallback: true,
+          message: isMissingTableError(error)
+            ? 'Connected to Supabase, but dashboard tables are not installed yet. Showing mock data.'
+            : `Supabase read failed: ${error.message}. Showing mock data.`,
+        };
+      }
+
+      if (!data || data.length === 0) {
+        return {
+          configured: true,
+          connected: true,
+          usingMockFallback: true,
+          message: 'Connected to Supabase, but dashboard tables are empty. Showing mock data until rows are available.',
+        };
+      }
+
+      return {
+        configured: true,
+        connected: true,
+        usingMockFallback: false,
+        message: 'Connected to Supabase. Reading live dashboard data.',
+      };
+    } catch (err) {
+      return {
+        configured: true,
+        connected: false,
+        usingMockFallback: true,
+        message: `Supabase connection failed: ${err instanceof Error ? err.message : 'Unknown error'}. Showing mock data.`,
+      };
+    }
+  },
+
   // Portfolio Summary
   async getPortfolioSummary(): Promise<typeof portfolioSummary> {
     if (!canReadSupabase()) return portfolioSummary;

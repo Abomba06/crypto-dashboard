@@ -21,3 +21,7 @@ EXPO_PUBLIC_SUPABASE_PUBLISHABLE_KEY=
 ```
 
 The app reads from Supabase and falls back to mock data when live data is unavailable. It does not connect to Alpaca and does not include trading logic or broker keys.
+
+## Supabase Tables
+
+Run [supabase/schema.sql](supabase/schema.sql) in the Supabase SQL editor for the project used by the app. You can also run [supabase/seed.sql](supabase/seed.sql) to add starter rows. The app reads these tables with the publishable key and falls back to mock data if the tables are missing or empty.

@@ -17,6 +17,7 @@ import {
   View,
 } from 'react-native';
 import { dashboardService } from './src/services/dashboardService';
+import { DataSourceStatus } from './src/services/dashboardService';
 import {
   BotState,
   EvaluationRecord,
@@ -204,6 +205,7 @@ function useResource<T>(loader: () => Promise<T>) {
 }
 
 function DashboardScreen() {
+  const source = useResource<DataSourceStatus>(() => dashboardService.getDataSourceStatus());
   const summary = useResource<PortfolioSummary>(() => dashboardService.getPortfolioSummary());
   const positions = useResource<Position[]>(() => dashboardService.getPositions());
   const signals = useResource<Signal[]>(() => dashboardService.getSignals());
@@ -226,6 +228,18 @@ function DashboardScreen() {
       >
         {summary.loading ? <LoadingState /> : null}
         {summary.error ? <ErrorState message={summary.error} onRetry={summary.reload} /> : null}
+        {source.data ? (
+          <LiquidCard>
+            <View style={styles.rowBetween}>
+              <View style={styles.headerCopy}>
+                <Text style={styles.micro}>Data Source</Text>
+                <Text style={styles.cardTitle}>{source.data.connected ? 'Supabase Live' : 'Mock Fallback'}</Text>
+              </View>
+              <Badge label={source.data.connected ? 'Live' : 'Mock'} tone={source.data.connected ? colors.cyan : colors.amber} />
+            </View>
+            <Text style={styles.bodyText}>{source.data.message}</Text>
+          </LiquidCard>
+        ) : null}
         {summary.data ? (
           <LiquidCard style={styles.heroCard}>
             <View style={styles.rowBetween}>
