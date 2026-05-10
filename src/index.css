@@ -18,9 +18,7 @@ html, body, #root {
 
 body {
   margin: 0;
-  background: radial-gradient(circle at top, rgba(87, 67, 255, 0.16), transparent 22%),
-    radial-gradient(circle at 20% 10%, rgba(105, 96, 255, 0.14), transparent 18%),
-    #02030a;
+  background: #080b10;
 }
 
 button {

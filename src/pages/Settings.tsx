@@ -47,7 +47,7 @@ function Settings() {
         </div>
         <div className="settings-card">
           <h3>Watchlist</h3>
-          <p>BTCUSD • ETHUSD • SOLUSD • LINKUSD</p>
+          <p>BTCUSD / ETHUSD / SOLUSD / LINKUSD</p>
         </div>
         <div className="settings-card">
           <h3>Alerts</h3>

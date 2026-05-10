@@ -9,6 +9,7 @@ const moreItems = [
   { id: 'evaluations', label: 'Evaluations' },
   { id: 'reports', label: 'Reports' },
   { id: 'state', label: 'State' },
+  { id: 'settings', label: 'Settings' },
 ];
 
 function More({ onNavigate }: MoreProps) {
