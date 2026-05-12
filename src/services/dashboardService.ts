@@ -93,6 +93,8 @@ const mapAccountSnapshot = (row: AccountSnapshot): PortfolioSummary => ({
   lastUpdated: row.last_updated,
 });
 
+const mapAccountSnapshotValue = (row: AccountSnapshot) => row.total_value;
+
 const mapPosition = (row: Position): AppPosition => ({
   id: row.id,
   symbol: row.symbol,
@@ -265,6 +267,19 @@ export const dashboardService = {
       .single();
 
     return mapAccountSnapshot(requireRow('account_snapshots', data, error));
+  },
+
+  async getPortfolioHistory(): Promise<number[]> {
+    const { data, error } = await requireSupabase()
+      .from('account_snapshots')
+      .select('*')
+      .order('updated_at', { ascending: false })
+      .limit(24);
+
+    return requireRows('account_snapshots', data, error)
+      .slice()
+      .reverse()
+      .map(mapAccountSnapshotValue);
   },
 
   // Positions

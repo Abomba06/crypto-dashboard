@@ -79,6 +79,13 @@ function buildTodayMoneyPath(summary: PortfolioSummary) {
   return progress.map((step, index) => startValue + summary.todayPnL * step + pulse[index] * volatility);
 }
 
+function buildChartValues(values: number[] | null | undefined, summary: PortfolioSummary) {
+  const cleanValues = values?.filter((value) => Number.isFinite(value)) ?? [];
+  if (cleanValues.length >= 2) return cleanValues;
+
+  return buildTodayMoneyPath(summary);
+}
+
 function labelColor(value: string) {
   if (['bullish', 'buy', 'accepted', 'running', 'info', 'confirmed', 'high'].includes(value)) return colors.cyan;
   if (['bearish', 'sell', 'rejected', 'stopped', 'error'].includes(value)) return colors.red;
@@ -163,13 +170,25 @@ function ErrorState({ message, onRetry }: { message: string; onRetry: () => void
 function MiniChart({ values }: { values: number[] }) {
   const width = 250;
   const height = 70;
-  const min = Math.min(...values);
-  const max = Math.max(...values);
+  const chartValues = values.filter((value) => Number.isFinite(value));
+
+  if (chartValues.length === 0) {
+    return (
+      <View style={styles.chartEmpty}>
+        <Text style={styles.emptyText}>No chart data</Text>
+      </View>
+    );
+  }
+
+  const safeValues = chartValues.length === 1 ? [chartValues[0], chartValues[0]] : chartValues;
+  const min = Math.min(...safeValues);
+  const max = Math.max(...safeValues);
   const range = max - min || 1;
-  const points = values
+  const midY = height / 2;
+  const points = safeValues
     .map((value, index) => {
-      const x = (index / Math.max(values.length - 1, 1)) * width;
-      const y = height - ((value - min) / range) * height;
+      const x = (index / Math.max(safeValues.length - 1, 1)) * width;
+      const y = max === min ? midY : height - ((value - min) / range) * height;
       return `${x},${y}`;
     })
     .join(' ');
@@ -177,9 +196,9 @@ function MiniChart({ values }: { values: number[] }) {
   return (
     <Svg width="100%" height={86} viewBox={`0 0 ${width} ${height}`}>
       <Polyline points={points} fill="none" stroke={colors.cyan} strokeWidth="4" strokeLinecap="round" strokeLinejoin="round" />
-      {values.map((value, index) => {
-        const x = (index / Math.max(values.length - 1, 1)) * width;
-        const y = height - ((value - min) / range) * height;
+      {safeValues.map((value, index) => {
+        const x = (index / Math.max(safeValues.length - 1, 1)) * width;
+        const y = max === min ? midY : height - ((value - min) / range) * height;
         return <Circle key={`${value}-${index}`} cx={x} cy={y} r="3" fill={colors.blue} />;
       })}
     </Svg>
@@ -246,14 +265,16 @@ function useResource<T>(loader: () => Promise<T>) {
 function DashboardScreen() {
   const source = useResource<DataSourceStatus>(() => dashboardService.getDataSourceStatus());
   const summary = useResource<PortfolioSummary>(() => dashboardService.getPortfolioSummary());
+  const portfolioHistory = useResource<number[]>(() => dashboardService.getPortfolioHistory());
   const positions = useResource<Position[]>(() => dashboardService.getPositions());
   const signals = useResource<Signal[]>(() => dashboardService.getSignals());
   const events = useResource<MarketEvent[]>(() => dashboardService.getMarketEvents());
 
-  const refreshing = source.refreshing || summary.refreshing || positions.refreshing || signals.refreshing || events.refreshing;
+  const refreshing = source.refreshing || summary.refreshing || portfolioHistory.refreshing || positions.refreshing || signals.refreshing || events.refreshing;
   const refresh = () => {
     source.refresh();
     summary.refresh();
+    portfolioHistory.refresh();
     positions.refresh();
     signals.refresh();
     events.refresh();
@@ -268,6 +289,7 @@ function DashboardScreen() {
       >
         {summary.loading ? <LoadingState /> : null}
         {summary.error ? <ErrorState message={summary.error} onRetry={summary.reload} /> : null}
+        {portfolioHistory.error ? <ErrorState message={portfolioHistory.error} onRetry={portfolioHistory.reload} /> : null}
         {source.data ? (
           <LiquidCard>
             <View style={styles.rowBetween}>
@@ -295,7 +317,7 @@ function DashboardScreen() {
               <Metric label="Buying Power" value={formatCurrency(summary.data.buyingPower)} />
               <Metric label="Regime" value={summary.data.regime} tone={colors.blue} />
             </View>
-            <MoneyChangeChart values={buildTodayMoneyPath(summary.data)} change={summary.data.todayPnL} />
+            <MoneyChangeChart values={buildChartValues(portfolioHistory.data, summary.data)} change={summary.data.todayPnL} />
           </LiquidCard>
         ) : null}
 
@@ -779,6 +801,11 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'space-between',
     gap: 10,
+  },
+  chartEmpty: {
+    height: 86,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   rowBetween: {
     flexDirection: 'row',
