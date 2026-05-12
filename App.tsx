@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { NavigationContainer, useNavigation } from '@react-navigation/native';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
@@ -68,6 +68,15 @@ const colors = {
 
 function formatCurrency(value: number) {
   return `$${value.toLocaleString(undefined, { maximumFractionDigits: 2 })}`;
+}
+
+function buildTodayMoneyPath(summary: PortfolioSummary) {
+  const startValue = summary.totalValue - summary.todayPnL;
+  const progress = [0, 0.16, 0.28, 0.43, 0.58, 0.72, 0.86, 1];
+  const pulse = [0, -0.08, 0.1, -0.03, 0.15, 0.05, 0.18, 0];
+  const volatility = Math.max(Math.abs(summary.todayPnL) * 0.18, summary.totalValue * 0.0006);
+
+  return progress.map((step, index) => startValue + summary.todayPnL * step + pulse[index] * volatility);
 }
 
 function labelColor(value: string) {
@@ -177,25 +186,55 @@ function MiniChart({ values }: { values: number[] }) {
   );
 }
 
+function MoneyChangeChart({ values, change }: { values: number[]; change: number }) {
+  const positive = change >= 0;
+  const start = values[0] ?? 0;
+  const end = values[values.length - 1] ?? start;
+
+  return (
+    <View style={styles.moneyChartPanel}>
+      <View style={styles.rowBetween}>
+        <View>
+          <Text style={styles.micro}>Today Money Change</Text>
+          <Text style={[styles.chartChange, { color: positive ? colors.cyan : colors.red }]}>
+            {positive ? '+' : ''}{formatCurrency(change)}
+          </Text>
+        </View>
+        <Badge label={positive ? 'Up Today' : 'Down Today'} tone={positive ? colors.cyan : colors.red} />
+      </View>
+      <MiniChart values={values} />
+      <View style={styles.chartLegend}>
+        <Text style={styles.cardMeta}>Open {formatCurrency(start)}</Text>
+        <Text style={styles.cardMeta}>Now {formatCurrency(end)}</Text>
+      </View>
+    </View>
+  );
+}
+
 function useResource<T>(loader: () => Promise<T>) {
+  const loaderRef = useRef(loader);
   const [data, setData] = useState<T | null>(null);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState('');
+
+  useEffect(() => {
+    loaderRef.current = loader;
+  }, [loader]);
 
   const load = useCallback(async (isRefresh = false) => {
     try {
       if (isRefresh) setRefreshing(true);
       else setLoading(true);
       setError('');
-      setData(await loader());
+      setData(await loaderRef.current());
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Unable to load data');
     } finally {
       setLoading(false);
       setRefreshing(false);
     }
-  }, [loader]);
+  }, []);
 
   useEffect(() => {
     load();
@@ -211,8 +250,9 @@ function DashboardScreen() {
   const signals = useResource<Signal[]>(() => dashboardService.getSignals());
   const events = useResource<MarketEvent[]>(() => dashboardService.getMarketEvents());
 
-  const refreshing = summary.refreshing || positions.refreshing || signals.refreshing || events.refreshing;
+  const refreshing = source.refreshing || summary.refreshing || positions.refreshing || signals.refreshing || events.refreshing;
   const refresh = () => {
+    source.refresh();
     summary.refresh();
     positions.refresh();
     signals.refresh();
@@ -250,11 +290,12 @@ function DashboardScreen() {
               <Badge label={summary.data.health} tone={labelColor(summary.data.health)} />
             </View>
             <View style={styles.metricGrid}>
-              <Metric label="Today P/L" value={`${summary.data.todayPnL >= 0 ? '+' : ''}${summary.data.todayPnL.toFixed(2)}%`} tone={summary.data.todayPnL >= 0 ? colors.cyan : colors.red} />
+              <Metric label="Today P/L" value={`${summary.data.todayPnL >= 0 ? '+' : ''}${formatCurrency(summary.data.todayPnL)}`} tone={summary.data.todayPnL >= 0 ? colors.cyan : colors.red} />
               <Metric label="Open P/L" value={formatCurrency(summary.data.openPnL)} tone={summary.data.openPnL >= 0 ? colors.cyan : colors.red} />
               <Metric label="Buying Power" value={formatCurrency(summary.data.buyingPower)} />
               <Metric label="Regime" value={summary.data.regime} tone={colors.blue} />
             </View>
+            <MoneyChangeChart values={buildTodayMoneyPath(summary.data)} change={summary.data.todayPnL} />
           </LiquidCard>
         ) : null}
 
@@ -715,6 +756,26 @@ const styles = StyleSheet.create({
     fontSize: 34,
     lineHeight: 38,
     fontWeight: '900',
+  },
+  moneyChartPanel: {
+    marginTop: 2,
+    padding: 12,
+    borderRadius: 14,
+    borderWidth: 1,
+    borderColor: 'rgba(117, 230, 216, 0.18)',
+    backgroundColor: 'rgba(117, 230, 216, 0.06)',
+  },
+  chartChange: {
+    marginTop: 6,
+    fontSize: 22,
+    lineHeight: 26,
+    fontWeight: '900',
+  },
+  chartLegend: {
+    marginTop: -4,
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    gap: 10,
   },
   rowBetween: {
     flexDirection: 'row',

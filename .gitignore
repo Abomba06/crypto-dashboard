@@ -11,3 +11,6 @@ stitch.local.toml
 node_modules/
 dist/
 .vite/
+
+# Expo local state
+.expo/
