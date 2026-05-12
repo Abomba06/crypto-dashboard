@@ -273,9 +273,9 @@ function DashboardScreen() {
             <View style={styles.rowBetween}>
               <View style={styles.headerCopy}>
                 <Text style={styles.micro}>Data Source</Text>
-                <Text style={styles.cardTitle}>{source.data.connected ? 'Supabase Live' : 'Mock Fallback'}</Text>
+                <Text style={styles.cardTitle}>{source.data.connected ? 'Supabase Live' : 'Supabase Error'}</Text>
               </View>
-              <Badge label={source.data.connected ? 'Live' : 'Mock'} tone={source.data.connected ? colors.cyan : colors.amber} />
+              <Badge label={source.data.connected ? 'Live' : 'Error'} tone={source.data.connected ? colors.cyan : colors.amber} />
             </View>
             <Text style={styles.bodyText}>{source.data.message}</Text>
           </LiquidCard>
@@ -452,7 +452,7 @@ function SettingsScreen() {
       <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.scrollContent}>
         <LiquidCard>
           <Text style={styles.cardTitle}>Data Source</Text>
-          <Text style={styles.bodyText}>Supabase read-only mode. Mock data is used automatically when live data is unavailable.</Text>
+          <Text style={styles.bodyText}>Supabase read-only mode. Missing live data is shown as an error.</Text>
         </LiquidCard>
         <LiquidCard>
           <Text style={styles.cardTitle}>Trading Connections</Text>
@@ -560,6 +560,9 @@ function ReportsScreen() {
     <ScreenFrame title="Reports" subtitle="Read-only research summaries">
       <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.scrollContent}>
         {reports.loading || variants.loading || comparisons.loading ? <LoadingState /> : null}
+        {reports.error ? <ErrorState message={reports.error} onRetry={reports.reload} /> : null}
+        {variants.error ? <ErrorState message={variants.error} onRetry={variants.reload} /> : null}
+        {comparisons.error ? <ErrorState message={comparisons.error} onRetry={comparisons.reload} /> : null}
         {reports.data?.map((report) => (
           <LiquidCard key={report.id}>
             <Text style={styles.cardTitle}>{report.name}</Text>

@@ -1,32 +1,29 @@
 import { hasSupabaseConfig, supabase } from '../utils/supabase/client';
 import {
-  portfolioSummary,
-  positions,
-  signals,
-  marketEvents,
-  trades,
-  logs,
-  evaluations,
-  researchReports,
-  variantReports,
-  comparisonReports,
-  botState,
-} from '../data/mockData';
-import {
   AccountSnapshot,
   Position,
   Trade,
-  Order,
   Signal,
   MarketEvent,
-  CatalystEvent,
   CandidateEvaluation,
   RejectedSignalEvaluation,
   BotLog,
   BotState,
   ResearchReport,
-  RealtimePayload,
 } from '../types/supabase';
+import {
+  BotState as AppBotState,
+  ComparisonReport as AppComparisonReport,
+  EvaluationRecord,
+  LogEntry,
+  MarketEvent as AppMarketEvent,
+  PortfolioSummary,
+  Position as AppPosition,
+  ResearchReport as AppResearchReport,
+  Signal as AppSignal,
+  Trade as AppTrade,
+  VariantReport as AppVariantReport,
+} from '../types/trading';
 
 const noOpSubscription = {
   unsubscribe: () => undefined,
@@ -38,15 +35,51 @@ const missingTableMessage = 'Could not find the table';
 export type DataSourceStatus = {
   configured: boolean;
   connected: boolean;
-  usingMockFallback: boolean;
   message: string;
 };
 
 const isMissingTableError = (error: { message?: string } | null | undefined) =>
   Boolean(error?.message?.includes(missingTableMessage));
 
+const requireSupabase = () => {
+  if (!canReadSupabase()) {
+    throw new Error('Missing EXPO_PUBLIC_SUPABASE_URL or EXPO_PUBLIC_SUPABASE_PUBLISHABLE_KEY.');
+  }
+
+  return supabase!;
+};
+
+const readError = (table: string, error: { message?: string } | null | undefined) =>
+  isMissingTableError(error)
+    ? `Supabase table "${table}" is missing. Run supabase/schema.sql.`
+    : `Supabase read failed for "${table}": ${error?.message ?? 'Unknown error'}.`;
+
+const requireRows = <T>(table: string, data: T[] | null | undefined, error: { message?: string } | null | undefined) => {
+  if (error) {
+    throw new Error(readError(table, error));
+  }
+
+  if (!data || data.length === 0) {
+    throw new Error(`Supabase table "${table}" has no rows.`);
+  }
+
+  return data;
+};
+
+const requireRow = <T>(table: string, data: T | null | undefined, error: { message?: string } | null | undefined) => {
+  if (error) {
+    throw new Error(readError(table, error));
+  }
+
+  if (!data) {
+    throw new Error(`Supabase table "${table}" has no rows.`);
+  }
+
+  return data;
+};
+
 // Helper to convert Supabase row to app format
-const mapAccountSnapshot = (row: AccountSnapshot): typeof portfolioSummary => ({
+const mapAccountSnapshot = (row: AccountSnapshot): PortfolioSummary => ({
   totalValue: row.total_value,
   todayPnL: row.today_pnl,
   openPnL: row.open_pnl,
@@ -60,7 +93,7 @@ const mapAccountSnapshot = (row: AccountSnapshot): typeof portfolioSummary => ({
   lastUpdated: row.last_updated,
 });
 
-const mapPosition = (row: Position): typeof positions[0] => ({
+const mapPosition = (row: Position): AppPosition => ({
   id: row.id,
   symbol: row.symbol,
   name: row.name,
@@ -78,7 +111,7 @@ const mapPosition = (row: Position): typeof positions[0] => ({
   updatedAt: row.updated_at,
 });
 
-const mapSignal = (row: Signal): typeof signals[0] => ({
+const mapSignal = (row: Signal): AppSignal => ({
   id: row.id,
   symbol: row.symbol,
   setup: row.setup,
@@ -93,7 +126,7 @@ const mapSignal = (row: Signal): typeof signals[0] => ({
   updatedAt: row.updated_at,
 });
 
-const mapMarketEvent = (row: MarketEvent): typeof marketEvents[0] => ({
+const mapMarketEvent = (row: MarketEvent): AppMarketEvent => ({
   id: row.id,
   title: row.title,
   description: row.description,
@@ -104,7 +137,7 @@ const mapMarketEvent = (row: MarketEvent): typeof marketEvents[0] => ({
   createdAt: row.created_at,
 });
 
-const mapTrade = (row: Trade): typeof trades[0] => ({
+const mapTrade = (row: Trade): AppTrade => ({
   id: row.id,
   timestamp: row.timestamp,
   symbol: row.symbol,
@@ -122,14 +155,14 @@ const mapTrade = (row: Trade): typeof trades[0] => ({
   note: `order_id=${row.id}; side=${row.side};`,
 });
 
-const mapBotLog = (row: BotLog): typeof logs[0] => ({
+const mapBotLog = (row: BotLog): LogEntry => ({
   id: row.id,
   timestamp: row.timestamp,
   severity: row.level,
   message: row.message,
 });
 
-const mapBotState = (row: BotState): typeof botState => ({
+const mapBotState = (row: BotState): AppBotState => ({
   id: row.id,
   status: row.status,
   lastActive: row.last_active,
@@ -139,7 +172,7 @@ const mapBotState = (row: BotState): typeof botState => ({
   updatedAt: row.updated_at,
 });
 
-const mapResearchReport = (row: ResearchReport): typeof researchReports[0] => ({
+const mapResearchReport = (row: ResearchReport): AppResearchReport => ({
   id: row.id,
   name: row.title,
   summary: row.summary,
@@ -147,20 +180,47 @@ const mapResearchReport = (row: ResearchReport): typeof researchReports[0] => ({
   notes: row.content,
 });
 
-// Service with Supabase integration and mock fallbacks
+const mapCandidateEvaluation = (row: CandidateEvaluation): EvaluationRecord => ({
+  id: row.id,
+  symbol: row.signal_id,
+  eventType: 'candidate',
+  status: 'accepted',
+  rejectionReason: '',
+  forwardReturn: row.score,
+  mfe: 0,
+  mae: 0,
+  tp1Hit: false,
+  stopHit: false,
+  sentiment: row.score,
+});
+
+const mapRejectedEvaluation = (row: RejectedSignalEvaluation): EvaluationRecord => ({
+  id: row.id,
+  symbol: row.signal_id,
+  eventType: 'rejected',
+  status: 'rejected',
+  rejectionReason: row.reason,
+  forwardReturn: 0,
+  mfe: 0,
+  mae: 0,
+  tp1Hit: false,
+  stopHit: false,
+  sentiment: 0,
+});
+
+// Service with Supabase integration only. Missing data throws visible app errors.
 export const dashboardService = {
   async getDataSourceStatus(): Promise<DataSourceStatus> {
     if (!canReadSupabase()) {
       return {
         configured: false,
         connected: false,
-        usingMockFallback: true,
-        message: 'Missing EXPO_PUBLIC_SUPABASE_URL or EXPO_PUBLIC_SUPABASE_PUBLISHABLE_KEY. Showing mock data.',
+        message: 'Missing EXPO_PUBLIC_SUPABASE_URL or EXPO_PUBLIC_SUPABASE_PUBLISHABLE_KEY.',
       };
     }
 
     try {
-      const { data, error } = await supabase!
+      const { data, error } = await requireSupabase()
         .from('account_snapshots')
         .select('id')
         .limit(1);
@@ -169,10 +229,7 @@ export const dashboardService = {
         return {
           configured: true,
           connected: false,
-          usingMockFallback: true,
-          message: isMissingTableError(error)
-            ? 'Connected to Supabase, but dashboard tables are not installed yet. Showing mock data.'
-            : `Supabase read failed: ${error.message}. Showing mock data.`,
+          message: readError('account_snapshots', error),
         };
       }
 
@@ -180,249 +237,149 @@ export const dashboardService = {
         return {
           configured: true,
           connected: true,
-          usingMockFallback: true,
-          message: 'Connected to Supabase, but dashboard tables are empty. Showing mock data until rows are available.',
+          message: 'Connected to Supabase, but account_snapshots has no rows.',
         };
       }
 
       return {
         configured: true,
         connected: true,
-        usingMockFallback: false,
         message: 'Connected to Supabase. Reading live dashboard data.',
       };
     } catch (err) {
       return {
         configured: true,
         connected: false,
-        usingMockFallback: true,
-        message: `Supabase connection failed: ${err instanceof Error ? err.message : 'Unknown error'}. Showing mock data.`,
+        message: `Supabase connection failed: ${err instanceof Error ? err.message : 'Unknown error'}.`,
       };
     }
   },
 
   // Portfolio Summary
-  async getPortfolioSummary(): Promise<typeof portfolioSummary> {
-    if (!canReadSupabase()) return portfolioSummary;
+  async getPortfolioSummary(): Promise<PortfolioSummary> {
+    const { data, error } = await requireSupabase()
+      .from('account_snapshots')
+      .select('*')
+      .order('updated_at', { ascending: false })
+      .limit(1)
+      .single();
 
-    try {
-      const { data, error } = await supabase!
-        .from('account_snapshots')
-        .select('*')
-        .order('updated_at', { ascending: false })
-        .limit(1)
-        .single();
-
-      if (error || !data) {
-        console.warn('Supabase account_snapshots error, using mock data:', error);
-        return portfolioSummary;
-      }
-
-      return mapAccountSnapshot(data);
-    } catch (err) {
-      console.warn('Failed to fetch portfolio summary, using mock data:', err);
-      return portfolioSummary;
-    }
+    return mapAccountSnapshot(requireRow('account_snapshots', data, error));
   },
 
   // Positions
-  async getPositions(): Promise<typeof positions> {
-    if (!canReadSupabase()) return positions;
+  async getPositions(): Promise<AppPosition[]> {
+    const { data, error } = await requireSupabase()
+      .from('positions')
+      .select('*')
+      .order('updated_at', { ascending: false });
 
-    try {
-      const { data, error } = await supabase!
-        .from('positions')
-        .select('*')
-        .order('updated_at', { ascending: false });
-
-      if (error || !data || data.length === 0) {
-        console.warn('Supabase positions error, using mock data:', error);
-        return positions;
-      }
-
-      return data.map(mapPosition);
-    } catch (err) {
-      console.warn('Failed to fetch positions, using mock data:', err);
-      return positions;
-    }
+    return requireRows('positions', data, error).map(mapPosition);
   },
 
   // Signals
-  async getSignals(): Promise<typeof signals> {
-    if (!canReadSupabase()) return signals;
+  async getSignals(): Promise<AppSignal[]> {
+    const { data, error } = await requireSupabase()
+      .from('signals')
+      .select('*')
+      .order('created_at', { ascending: false })
+      .limit(50);
 
-    try {
-      const { data, error } = await supabase!
-        .from('signals')
-        .select('*')
-        .order('created_at', { ascending: false })
-        .limit(50);
-
-      if (error || !data || data.length === 0) {
-        console.warn('Supabase signals error, using mock data:', error);
-        return signals;
-      }
-
-      return data.map(mapSignal);
-    } catch (err) {
-      console.warn('Failed to fetch signals, using mock data:', err);
-      return signals;
-    }
+    return requireRows('signals', data, error).map(mapSignal);
   },
 
   // Market Events
-  async getMarketEvents(): Promise<typeof marketEvents> {
-    if (!canReadSupabase()) return marketEvents;
+  async getMarketEvents(): Promise<AppMarketEvent[]> {
+    const { data, error } = await requireSupabase()
+      .from('market_events')
+      .select('*')
+      .order('timestamp', { ascending: false })
+      .limit(20);
 
-    try {
-      const { data, error } = await supabase!
-        .from('market_events')
-        .select('*')
-        .order('timestamp', { ascending: false })
-        .limit(20);
-
-      if (error || !data || data.length === 0) {
-        console.warn('Supabase market_events error, using mock data:', error);
-        return marketEvents;
-      }
-
-      return data.map(mapMarketEvent);
-    } catch (err) {
-      console.warn('Failed to fetch market events, using mock data:', err);
-      return marketEvents;
-    }
+    return requireRows('market_events', data, error).map(mapMarketEvent);
   },
 
   // Trades
-  async getTrades(): Promise<typeof trades> {
-    if (!canReadSupabase()) return trades;
+  async getTrades(): Promise<AppTrade[]> {
+    const { data, error } = await requireSupabase()
+      .from('trades')
+      .select('*')
+      .order('timestamp', { ascending: false })
+      .limit(50);
 
-    try {
-      const { data, error } = await supabase!
-        .from('trades')
-        .select('*')
-        .order('timestamp', { ascending: false })
-        .limit(50);
-
-      if (error || !data || data.length === 0) {
-        console.warn('Supabase trades error, using mock data:', error);
-        return trades;
-      }
-
-      return data.map(mapTrade);
-    } catch (err) {
-      console.warn('Failed to fetch trades, using mock data:', err);
-      return trades;
-    }
+    return requireRows('trades', data, error).map(mapTrade);
   },
 
   // Bot Logs
-  async getLogs(): Promise<typeof logs> {
-    if (!canReadSupabase()) return logs;
+  async getLogs(): Promise<LogEntry[]> {
+    const { data, error } = await requireSupabase()
+      .from('bot_logs')
+      .select('*')
+      .order('timestamp', { ascending: false })
+      .limit(100);
 
-    try {
-      const { data, error } = await supabase!
-        .from('bot_logs')
-        .select('*')
-        .order('timestamp', { ascending: false })
-        .limit(100);
-
-      if (error || !data || data.length === 0) {
-        console.warn('Supabase bot_logs error, using mock data:', error);
-        return logs;
-      }
-
-      return data.map(mapBotLog);
-    } catch (err) {
-      console.warn('Failed to fetch logs, using mock data:', err);
-      return logs;
-    }
+    return requireRows('bot_logs', data, error).map(mapBotLog);
   },
 
   // Evaluations (combining candidate and rejected)
-  async getEvaluations(): Promise<typeof evaluations> {
-    if (!canReadSupabase()) return evaluations;
+  async getEvaluations(): Promise<EvaluationRecord[]> {
+    const client = requireSupabase();
+    const [candidatesRes, rejectedRes] = await Promise.all([
+      client.from('candidate_evaluations').select('*').order('created_at', { ascending: false }).limit(25),
+      client.from('rejected_signal_evaluations').select('*').order('created_at', { ascending: false }).limit(25),
+    ]);
 
-    try {
-      const [candidatesRes, rejectedRes] = await Promise.all([
-        supabase!.from('candidate_evaluations').select('*').order('created_at', { ascending: false }).limit(25),
-        supabase!.from('rejected_signal_evaluations').select('*').order('created_at', { ascending: false }).limit(25),
-      ]);
-
-      if (candidatesRes.error || rejectedRes.error) {
-        console.warn('Supabase evaluations error, using mock data:', candidatesRes.error || rejectedRes.error);
-        return evaluations;
-      }
-
-      const candidates = candidatesRes.data?.map(c => ({ ...c, type: 'candidate' as const })) || [];
-      const rejected = rejectedRes.data?.map(r => ({ ...r, type: 'rejected' as const })) || [];
-
-      if (candidates.length === 0 && rejected.length === 0) {
-        return evaluations;
-      }
-
-      return [...candidates, ...rejected];
-    } catch (err) {
-      console.warn('Failed to fetch evaluations, using mock data:', err);
-      return evaluations;
+    if (candidatesRes.error) {
+      throw new Error(readError('candidate_evaluations', candidatesRes.error));
     }
+
+    if (rejectedRes.error) {
+      throw new Error(readError('rejected_signal_evaluations', rejectedRes.error));
+    }
+
+    const candidates = candidatesRes.data ?? [];
+    const rejected = rejectedRes.data ?? [];
+
+    if (candidates.length === 0 && rejected.length === 0) {
+      throw new Error('Supabase evaluation tables have no rows.');
+    }
+
+    return [...candidates.map(mapCandidateEvaluation), ...rejected.map(mapRejectedEvaluation)];
   },
 
   // Research Reports
-  async getResearchReports(): Promise<typeof researchReports> {
-    if (!canReadSupabase()) return researchReports;
+  async getResearchReports(): Promise<AppResearchReport[]> {
+    const { data, error } = await requireSupabase()
+      .from('research_reports')
+      .select('*')
+      .order('timestamp', { ascending: false })
+      .limit(20);
 
-    try {
-      const { data, error } = await supabase!
-        .from('research_reports')
-        .select('*')
-        .order('timestamp', { ascending: false })
-        .limit(20);
-
-      if (error || !data || data.length === 0) {
-        console.warn('Supabase research_reports error, using mock data:', error);
-        return researchReports;
-      }
-
-      return data.map(mapResearchReport);
-    } catch (err) {
-      console.warn('Failed to fetch research reports, using mock data:', err);
-      return researchReports;
-    }
+    return requireRows('research_reports', data, error).map(mapResearchReport);
   },
 
-  // Variant Reports (fallback to mock)
-  getVariantReports: () => Promise.resolve(variantReports),
+  getVariantReports: async (): Promise<AppVariantReport[]> => {
+    throw new Error('Variant reports are not backed by a Supabase table yet.');
+  },
 
-  // Comparison Reports (fallback to mock)
-  getComparisonReports: () => Promise.resolve(comparisonReports),
+  getComparisonReports: async (): Promise<AppComparisonReport[]> => {
+    throw new Error('Comparison reports are not backed by a Supabase table yet.');
+  },
 
   // Bot State
-  async getBotState(): Promise<typeof botState> {
-    if (!canReadSupabase()) return botState;
+  async getBotState(): Promise<AppBotState> {
+    const { data, error } = await requireSupabase()
+      .from('bot_state')
+      .select('*')
+      .order('updated_at', { ascending: false })
+      .limit(1)
+      .single();
 
-    try {
-      const { data, error } = await supabase!
-        .from('bot_state')
-        .select('*')
-        .order('updated_at', { ascending: false })
-        .limit(1)
-        .single();
-
-      if (error || !data) {
-        console.warn('Supabase bot_state error, using mock data:', error);
-        return botState;
-      }
-
-      return mapBotState(data);
-    } catch (err) {
-      console.warn('Failed to fetch bot state, using mock data:', err);
-      return botState;
-    }
+    return mapBotState(requireRow('bot_state', data, error));
   },
 
   // Realtime subscriptions
-  subscribeToPortfolioSummary(callback: (data: typeof portfolioSummary) => void) {
+  subscribeToPortfolioSummary(callback: (data: PortfolioSummary) => void) {
     if (!canReadSupabase()) return noOpSubscription;
 
     const channel = supabase!.channel('account_snapshots_changes').on(
@@ -443,7 +400,7 @@ export const dashboardService = {
     return channel;
   },
 
-  subscribeToPositions(callback: (data: typeof positions) => void) {
+  subscribeToPositions(callback: (data: AppPosition[]) => void) {
     if (!canReadSupabase()) return noOpSubscription;
 
     const channel = supabase!.channel('positions_changes').on(
@@ -463,7 +420,7 @@ export const dashboardService = {
     return channel;
   },
 
-  subscribeToTrades(callback: (data: typeof trades) => void) {
+  subscribeToTrades(callback: (data: AppTrade[]) => void) {
     if (!canReadSupabase()) return noOpSubscription;
 
     const channel = supabase!.channel('trades_changes').on(
@@ -483,7 +440,7 @@ export const dashboardService = {
     return channel;
   },
 
-  subscribeToSignals(callback: (data: typeof signals) => void) {
+  subscribeToSignals(callback: (data: AppSignal[]) => void) {
     if (!canReadSupabase()) return noOpSubscription;
 
     const channel = supabase!.channel('signals_changes').on(
@@ -503,7 +460,7 @@ export const dashboardService = {
     return channel;
   },
 
-  subscribeToLogs(callback: (data: typeof logs) => void) {
+  subscribeToLogs(callback: (data: LogEntry[]) => void) {
     if (!canReadSupabase()) return noOpSubscription;
 
     const channel = supabase!.channel('bot_logs_changes').on(
@@ -523,7 +480,7 @@ export const dashboardService = {
     return channel;
   },
 
-  subscribeToBotState(callback: (data: typeof botState) => void) {
+  subscribeToBotState(callback: (data: AppBotState) => void) {
     if (!canReadSupabase()) return noOpSubscription;
 
     const channel = supabase!.channel('bot_state_changes').on(
